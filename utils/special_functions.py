@@ -5,7 +5,7 @@ from functools import partial
 
 @partial(jax.vmap, in_axes=(0, None))
 @partial(jax.jit, static_argnums=(1,))
-def jax_sh(xyz, l_max):
+def spherical_harmonics(xyz, l_max):
     # Spherical harmonics
 
     assert xyz.shape[0] == 3
