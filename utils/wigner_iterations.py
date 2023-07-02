@@ -1,6 +1,10 @@
+import jax
 import jax.numpy as jnp
 
+from functools import partial
 
+
+@partial(jax.jit, static_argnames=("l1", "l2", "L"))
 def perform_wigner_operation(wk1, wk2, cg_tensor, l1, l2, L):
 
     dense_transformation_matrix = cg_tensor.reshape((2*l1+1)*(2*l2+1), 2*L+1)

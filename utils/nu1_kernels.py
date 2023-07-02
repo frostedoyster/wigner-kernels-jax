@@ -21,21 +21,14 @@ def get_equal_elements_labels(a, b):
     return jnp.stack([where//b.shape[0], where%b.shape[0]], axis=-1)
 
 
-def compute_wk_nu1_iijj(vectors1, vectors2, labels1, labels2, l_max, C_s, lambda_s):
-
-    #print(vectors1)
-    #print(vectors2)
+@partial(jax.jit, static_argnames="l_max")
+def compute_wk_nu1_iijj(vectors1, vectors2, equal_element_labels, l_max, C_s, lambda_s):
 
     sh1 = spherical_harmonics(vectors1, l_max)
     r1 = jnp.sqrt(jnp.sum(vectors1**2, axis=1))
 
     sh2 = spherical_harmonics(vectors2, l_max)
     r2 = jnp.sqrt(jnp.sum(vectors2**2, axis=1))
-
-    # print(r1, r2)
-
-    # Get all pairs for which the center and neighbor elements are the same:
-    equal_element_labels = get_equal_elements_labels(labels1[:, [3, 4]], labels2[:, [3, 4]])
 
     sh1_pairs = sh1[equal_element_labels[:, 0]]
     sh2_pairs = sh2[equal_element_labels[:, 1]]
@@ -55,18 +48,22 @@ def compute_wk_nu1_iijj(vectors1, vectors2, labels1, labels2, l_max, C_s, lambda
         # wk_nu1_iijj[l] = ((prefactors/(2*l+1))*((-1)**l)*sbessi_l)[:, None, None] * sh1_pairs_l[:, :, None] * sh2_pairs_l[:, None, :]
         wk_nu1_iijj[l] = (prefactors*sbessi_l)[:, None, None] * sh1_pairs_l[:, :, None] * sh2_pairs_l[:, None, :]
 
-    Sijai1_pairs = labels1[:, :4][equal_element_labels[:, 0]]
-    Sijai2_pairs = labels2[:, :4][equal_element_labels[:, 1]]
-    # assert jnp.all(Sijai1_pairs[:, 4] == Sijai2_pairs[:, 4])
-
-    return wk_nu1_iijj, Sijai1_pairs, Sijai2_pairs
+    return wk_nu1_iijj
 
 
 def compute_wk_nu1(jax_structures1, jax_structures2, all_species, l_max, r_cut, C_s, lambda_s):
 
     vectors1, labels1 = get_cartesian_vectors(jax_structures1, r_cut)
     vectors2, labels2 = get_cartesian_vectors(jax_structures2, r_cut)
-    wk_iijj, Sijai1_pairs, Sijai2_pairs = compute_wk_nu1_iijj(vectors1, vectors2, labels1, labels2, l_max, C_s, lambda_s)
+    
+    # Get all pairs for which the center and neighbor elements are the same:
+    equal_element_labels = get_equal_elements_labels(labels1[:, [3, 4]], labels2[:, [3, 4]])
+
+    wk_iijj = compute_wk_nu1_iijj(vectors1, vectors2, equal_element_labels, l_max, C_s, lambda_s)
+
+    Sijai1_pairs = labels1[:, :4][equal_element_labels[:, 0]]
+    Sijai2_pairs = labels2[:, :4][equal_element_labels[:, 1]]
+    # assert jnp.all(Sijai1_pairs[:, 4] == Sijai2_pairs[:, 4])
 
     wk_nu1_ii = {}
     s1 = {}

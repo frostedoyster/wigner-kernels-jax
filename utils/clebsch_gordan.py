@@ -26,7 +26,7 @@ def add_cg(cg_dictionary, l1, l2, L):
     r2c = {}
     c2r = {}
     for l in range(0, maxx + 1):
-        r2c[l] = _real2complex(l)
+        r2c[l] = real2complex(l)
         c2r[l] = jnp.conjugate(r2c[l]).T
 
     complex_cg = complex_clebsch_gordan_matrix(l1, l2, L)
@@ -51,7 +51,7 @@ def add_cg(cg_dictionary, l1, l2, L):
     cg_dictionary[(l1, l2, L)] = rcg
 
 
-def _real2complex(L):
+def real2complex(L):
     """
     Computes a matrix that can be used to convert from real to complex-valued
     spherical harmonics(coefficients) of order L.

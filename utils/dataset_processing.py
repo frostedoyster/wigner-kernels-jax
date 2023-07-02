@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as jnp
 import ase
 import numpy as np
@@ -28,7 +29,7 @@ class JaxStructures:
 
         self.ase_structures = atoms_list
         self.positions = jnp.array(jnp.concatenate(positions, axis=0))
-        self.cells = cells
+        self.cells = jnp.array(cells)
         self.structure_indices = jnp.array(structure_indices)
         self.atomic_species = atomic_species
         self.pbcs = pbcs
@@ -50,25 +51,42 @@ def get_cartesian_vectors(jax_structures, cutoff_radius):
         positions = jax_structures.positions[where_selected_structure]
         cell = jax_structures.cells[structure_index]
         species = jax_structures.atomic_species[structure_index]
+        
+        structure_vectors, structure_labels = compute_cartesian_vectors_structure(
+            positions, 
+            centers,
+            neighbors,
+            unit_cell_shift_vectors,
+            cell, 
+            species, 
+            structure_index
+        )
 
-        structure_vectors = positions[neighbors] - positions[centers] + unit_cell_shift_vectors @ cell  # Warning: it works but in a weird way when there is no cell
         vectors.append(structure_vectors)
-        labels.append(
-            jnp.stack([
-                jnp.array([structure_index]*len(centers)), 
-                centers, 
-                neighbors, 
-                species[centers], 
-                species[neighbors],
-                unit_cell_shift_vectors[:, 0],
-                unit_cell_shift_vectors[:, 1],
-                unit_cell_shift_vectors[:, 2]
-            ], axis=-1)) # "structure", "center", "neighbor", "species_center", "species_neighbor", "cell_x", "cell_y", "cell_z"
+        labels.append(structure_labels)
 
     vectors = jnp.concatenate(vectors, axis=0)
     labels = jnp.concatenate(labels, axis=0)
 
     return vectors, labels
+
+
+@jax.jit
+def compute_cartesian_vectors_structure(positions, centers, neighbors, unit_cell_shift_vectors, cell, species, structure_index):
+
+    structure_vectors = positions[neighbors] - positions[centers] + unit_cell_shift_vectors @ cell  # Warning: it works but in a weird way when there is no cell
+    structure_labels = jnp.stack([
+        jnp.array([structure_index]*len(centers)), 
+        centers, 
+        neighbors, 
+        species[centers], 
+        species[neighbors],
+        unit_cell_shift_vectors[:, 0],
+        unit_cell_shift_vectors[:, 1],
+        unit_cell_shift_vectors[:, 2]
+    ], axis=-1) # "structure", "center", "neighbor", "species_center", "species_neighbor", "cell_x", "cell_y", "cell_z"
+
+    return structure_vectors, structure_labels
 
 
 def get_neighbor_list(structure, cutoff_radius):

@@ -35,7 +35,7 @@ for a_i in all_species:
     assert jnp.all(s1[a_i]==s1_0[a_i])
     assert jnp.all(s2[a_i]==s2_0[a_i])
 
-invariant_wks = compute_wks_high_order(wks_nu1, all_species, nu_max, l_max)  # computes from nu = 1 to nu_max
+invariant_wks = compute_wks_high_order(wks_nu1, all_species, nu_max, l_max, cgs)  # computes from nu = 1 to nu_max
 invariant_wks = [wks_nu0] + invariant_wks  # prepend nu = 0
 
 invariant_wks_per_structure = []
