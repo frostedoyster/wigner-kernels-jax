@@ -19,8 +19,10 @@ np.random.seed(0)
 n_train = 15
 n_validation = 5
 n_test = 10
+batch_size = 10
 train_validation_structures = ase.io.read("datasets/gold.xyz", ":20")
 test_structures = ase.io.read("datasets/gold.xyz", "20:30")
+# structures = [ase.Atoms("H2", positions=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])]
 np.random.shuffle(train_validation_structures)
 train_structures = train_validation_structures[:n_train]
 validation_structures = train_validation_structures[n_train:]
@@ -29,10 +31,16 @@ train_targets = jnp.array([train_structure.info["elec. Free Energy [eV]"] for tr
 validation_targets = jnp.array([validation_structure.info["elec. Free Energy [eV]"] for validation_structure in validation_structures])
 test_targets = jnp.array([test_structure.info["elec. Free Energy [eV]"] for test_structure in test_structures])
 
-# structures = [ase.Atoms("H2", positions=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])]
-jax_structures_train = JaxStructures(train_structures)
-jax_structures_validation = JaxStructures(validation_structures)
-jax_structures_test = JaxStructures(test_structures)
+def split_list(lst, n):
+    """Yields successive n-sized chunks from lst."""
+    list_of_chunks = []
+    for i in range(0, len(lst), n):
+        list_of_chunks.append(lst[i:i+n])
+    return list_of_chunks
+
+train_batches = split_list(train_structures, batch_size)
+validation_batches = split_list(validation_structures, batch_size)
+test_batches = split_list(test_structures, batch_size)
 
 all_species_jax = jnp.sort(jnp.unique(jnp.concatenate(
         [train_structure.numbers for train_structure in train_structures] + 
@@ -52,6 +60,7 @@ lambda_s = 1.0
 
 def compute_wks(jax_structures1, jax_structures2):
 
+    # print(jax_structures1, jax_structures2)
     wks_nu0, s1_0, s2_0 = compute_wk_nu0(jax_structures1, jax_structures2, all_species)
     wks_nu1, s1, s2 = compute_wk_nu1(jax_structures1, jax_structures2, all_species, l_max, r_cut, C_s, lambda_s)
 
@@ -71,9 +80,27 @@ def compute_wks(jax_structures1, jax_structures2):
     invariant_wks_per_structure = jnp.stack(invariant_wks_per_structure, axis=-1)
     return invariant_wks_per_structure 
 
-train_train_kernels = compute_wks(jax_structures_train, jax_structures_train)
-validation_train_kernels = compute_wks(jax_structures_validation, jax_structures_train)
-test_train_kernels = compute_wks(jax_structures_test, jax_structures_train)
+def compute_wks_batches(batches1, batches2):
+    n1 = [len(batch) for batch in batches1]
+    n2 = [len(batch) for batch in batches2]
+    ntot1 = sum(n1)
+    ntot2 = sum(n2)
+    wks = jnp.empty((ntot1, ntot2, nu_max+1))
+    idx1 = 0
+    for batch1 in batches1:
+        idx2 = 0
+        for batch2 in batches2:
+            wks = wks.at[idx1:idx1+len(batch1), idx2:idx2+len(batch2), :].set(
+                compute_wks(JaxStructures(batch1), JaxStructures(batch2))
+            )
+            idx2 += len(batch2)
+        idx1 += len(batch1)
+    return wks
+
+
+train_train_kernels = compute_wks_batches(train_batches, train_batches)
+validation_train_kernels = compute_wks_batches(validation_batches, train_batches)
+test_train_kernels = compute_wks_batches(test_batches, train_batches)
 
 # 3D grid search
 optimization_target = "RMSE"

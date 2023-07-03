@@ -48,12 +48,9 @@ def scaled_spherical_bessel_i(x, l_max):
     sbessi = jnp.empty((l_max+1,))
     for l in range(l_max+1):
         if l == 0:
-            print(sbessi[l])
-            print(jnp.sinh(x)/x)
             sbessi = sbessi.at[l].set(
                 (1.0-jnp.exp(-2.0*x))/(2.0*x)
             )
-            print(sbessi[l])
         elif l == 1:
             sbessi = sbessi.at[l].set(
                 (1.0+jnp.exp(-2.0*x) - (1.0-jnp.exp(-2.0*x))/x)/(2.0*x)
