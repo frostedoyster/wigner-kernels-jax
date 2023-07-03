@@ -5,8 +5,8 @@ import jax.numpy as jnp
 def compute_stucture_wise_kernels(atom_wise_kernels, s1, s2):
 
     # Get the number of structures in both kernel dimensions:
-    n1 = jnp.max(jnp.concatenate([s1_ai for s1_ai in s1.values()]))
-    n2 = jnp.max(jnp.concatenate([s2_ai for s2_ai in s2.values()]))
+    n1 = jnp.max(jnp.concatenate([s1_ai for s1_ai in s1.values()])) + 1
+    n2 = jnp.max(jnp.concatenate([s2_ai for s2_ai in s2.values()])) + 1
     structure_wise_kernels = jnp.zeros((n1, n2))
 
     for a_i, atom_wise_kernels_ai in atom_wise_kernels.items():
