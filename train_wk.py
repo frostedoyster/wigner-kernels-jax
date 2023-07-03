@@ -12,6 +12,7 @@ from utils.nu1_kernels import compute_wk_nu1
 from utils.structure_wise import compute_stucture_wise_kernels
 from utils.clebsch_gordan import get_cg_coefficients
 from utils.wigner_iterations import compute_wks_high_order
+from utils.error_measures import get_mae, get_rmse
 
 
 np.random.seed(0)
@@ -68,18 +69,17 @@ def compute_wks(jax_structures1, jax_structures2):
         )
 
     invariant_wks_per_structure = jnp.stack(invariant_wks_per_structure, axis=-1)
-    print(invariant_wks_per_structure.shape)
     return invariant_wks_per_structure 
 
-print(train_targets, test_targets, validation_targets)
 train_train_kernels = compute_wks(jax_structures_train, jax_structures_train)
-print(train_train_kernels)
 validation_train_kernels = compute_wks(jax_structures_validation, jax_structures_train)
-print(validation_train_kernels)
 test_train_kernels = compute_wks(jax_structures_test, jax_structures_train)
-print(test_train_kernels)
 
 # 3D grid search
+optimization_target = "RMSE"
+validation_best = 1e30
+test_best = 1e30
+print((f"The optimization target is {optimization_target}"))
 for log_C0 in range(5, 15):
     for log_C in range(0, 10):
         for alpha in np.linspace(0, 2, 11):
@@ -90,5 +90,28 @@ for log_C0 in range(5, 15):
             validation_train_kernel = validation_train_kernels @ nu_coefficient_vector
             test_train_kernel = test_train_kernels @ nu_coefficient_vector
             c = jnp.linalg.solve(train_train_kernel+jnp.eye(n_train), train_targets)
-            validation_rmse = jnp.sqrt(jnp.sum((validation_targets - validation_train_kernel @ c)**2))
-            print(log_C0, log_C, alpha, validation_rmse)
+            if optimization_target == "RMSE":
+                train_error = get_rmse(train_targets, train_train_kernel @ c)
+                validation_error = get_rmse(validation_targets, validation_train_kernel @ c)
+                test_error = get_rmse(test_targets, test_train_kernel @ c)
+            elif optimization_target == "MAE":
+                train_error = get_mae(train_targets, train_train_kernel @ c)
+                validation_error = get_mae(validation_targets, validation_train_kernel @ c)
+            else:
+                raise ValueError("The optimization target must be rmse or mae")
+            print()
+            print(log_C0, log_C, alpha)
+            print(train_error, validation_error, test_error)
+            if validation_error < validation_best:
+                validation_best = validation_error
+                test_best = test_error
+                log_C0_best = log_C0
+                log_C_best = log_C
+                alpha_best = alpha
+
+print(f"Best optimization parameters: log_C0={log_C0_best}, log_C={log_C_best}, alpha={alpha_best}")
+print(f"Best validation error: {validation_best}")
+
+print()
+print(f"Test error ({optimization_target}):")
+print(test_best)
