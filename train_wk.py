@@ -6,7 +6,7 @@ import ase
 from ase import io
 from math import factorial
 
-from utils.dataset_processing import JaxStructures
+from utils.dataset_processing import create_jax_structures
 from utils.nu0_kernels import compute_wk_nu0
 from utils.nu1_kernels import compute_wk_nu1
 from utils.structure_wise import compute_stucture_wise_kernels
@@ -14,12 +14,14 @@ from utils.clebsch_gordan import get_cg_coefficients
 from utils.wigner_iterations import compute_wks_high_order
 from utils.error_measures import get_mae, get_rmse
 
+import tqdm
+
 
 np.random.seed(0)
 n_train = 15
 n_validation = 5
 n_test = 10
-batch_size = 10
+batch_size = 5
 train_validation_structures = ase.io.read("datasets/gold.xyz", ":20")
 test_structures = ase.io.read("datasets/gold.xyz", "20:30")
 # structures = [ase.Atoms("H2", positions=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])]
@@ -38,9 +40,6 @@ def split_list(lst, n):
         list_of_chunks.append(lst[i:i+n])
     return list_of_chunks
 
-train_batches = split_list(train_structures, batch_size)
-validation_batches = split_list(validation_structures, batch_size)
-test_batches = split_list(test_structures, batch_size)
 
 all_species_jax = jnp.sort(jnp.unique(jnp.concatenate(
         [train_structure.numbers for train_structure in train_structures] + 
@@ -58,11 +57,10 @@ lambda_s = 1.0
 
 
 
-def compute_wks(jax_structures1, jax_structures2):
+def compute_wks_single_batch(positions1, positions2, jax_structures1, jax_structures2):
 
-    # print(jax_structures1, jax_structures2)
     wks_nu0, s1_0, s2_0 = compute_wk_nu0(jax_structures1, jax_structures2, all_species)
-    wks_nu1, s1, s2 = compute_wk_nu1(jax_structures1, jax_structures2, all_species, l_max, r_cut, C_s, lambda_s)
+    wks_nu1, s1, s2 = compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all_species, l_max, r_cut, C_s, lambda_s)
 
     for a_i in all_species:
         assert jnp.all(s1[a_i]==s1_0[a_i])
@@ -80,27 +78,33 @@ def compute_wks(jax_structures1, jax_structures2):
     invariant_wks_per_structure = jnp.stack(invariant_wks_per_structure, axis=-1)
     return invariant_wks_per_structure 
 
-def compute_wks_batches(batches1, batches2):
+def compute_wks(structures1, structures2, batch_size):
+    batches1 = split_list(structures1, batch_size)
+    batches2 = split_list(structures2, batch_size)
     n1 = [len(batch) for batch in batches1]
     n2 = [len(batch) for batch in batches2]
     ntot1 = sum(n1)
     ntot2 = sum(n2)
+
+    jax_batches1 = [create_jax_structures(batch, r_cut) for batch in batches1]
+    jax_batches2 = [create_jax_structures(batch, r_cut) for batch in batches2]
+
     wks = jnp.empty((ntot1, ntot2, nu_max+1))
     idx1 = 0
-    for batch1 in batches1:
+    for jax_batch1 in tqdm.tqdm(jax_batches1):
         idx2 = 0
-        for batch2 in batches2:
-            wks = wks.at[idx1:idx1+len(batch1), idx2:idx2+len(batch2), :].set(
-                compute_wks(JaxStructures(batch1), JaxStructures(batch2))
-            )
-            idx2 += len(batch2)
-        idx1 += len(batch1)
+        for jax_batch2 in jax_batches2:
+
+            wks_single_batch = compute_wks_single_batch(jax_batch1["positions"], jax_batch2["positions"], jax_batch1, jax_batch2)
+            wks = wks.at[idx1:idx1+jax_batch1["n_structures"], idx2:idx2+jax_batch2["n_structures"], :].set(wks_single_batch)
+
+            idx2 += jax_batch2["n_structures"]
+        idx1 += jax_batch1["n_structures"]
     return wks
 
-
-train_train_kernels = compute_wks_batches(train_batches, train_batches)
-validation_train_kernels = compute_wks_batches(validation_batches, train_batches)
-test_train_kernels = compute_wks_batches(test_batches, train_batches)
+train_train_kernels = compute_wks(train_structures, train_structures, batch_size)
+validation_train_kernels = compute_wks(validation_structures, train_structures, batch_size)
+test_train_kernels = compute_wks(test_structures, train_structures, batch_size)
 
 # 3D grid search
 optimization_target = "RMSE"

@@ -4,89 +4,95 @@ import ase
 import numpy as np
 
 
-class JaxStructures:
+def create_jax_structures(ase_atoms_structures, cutoff_radius):
 
-    # This class essentially takes a list of ase.Atoms objects and converts
-    # all the relevant data into jax data structures
+    # This function essentially takes a list of ase.Atoms objects and converts
+    # all the relevant data into a dictionary of jax data structures
 
-    def __init__(self, atoms_list):
+    jax_structures = {}
         
-        self.n_structures = len(atoms_list)
+    jax_structures["n_structures"] = len(ase_atoms_structures)
 
-        positions = []
-        cells = []
-        structure_indices = []
-        atomic_species = []
-        pbcs = []
+    positions = []
+    cells = []
+    structure_indices = []
+    atomic_species = []
+    pbcs = []
 
-        for structure_index, atoms in enumerate(atoms_list):
-            positions.append(atoms.positions)
-            cells.append(atoms.cell)
-            for _ in range(atoms.positions.shape[0]):
-                structure_indices.append(structure_index)
-            atomic_species.append(atoms.get_atomic_numbers())
-            pbcs.append(atoms.pbc)
+    for structure_index, atoms in enumerate(ase_atoms_structures):
+        positions.append(atoms.positions)
+        cells.append(atoms.cell)
+        for _ in range(atoms.positions.shape[0]):
+            structure_indices.append(structure_index)
+        atomic_species.append(atoms.get_atomic_numbers())
+        pbcs.append(atoms.pbc)
 
-        self.ase_structures = atoms_list
-        self.positions = jnp.array(jnp.concatenate(positions, axis=0))
-        self.cells = jnp.array(cells)
-        self.structure_indices = jnp.array(structure_indices)
-        self.atomic_species = atomic_species
-        self.pbcs = pbcs
+    jax_structures["structure_offsets"] = jnp.cumsum(np.array([0] + [len(structure) for structure in ase_atoms_structures]))
+    jax_structures["positions"] = jnp.array(jnp.concatenate(positions, axis=0))
+    jax_structures["cells"] = jnp.array(cells)
+    jax_structures["structure_indices"] = jnp.array(structure_indices)
+    jax_structures["atomic_species"] = atomic_species
+    jax_structures["neighbor_list"] = get_batched_neighbor_list(ase_atoms_structures, cutoff_radius)
+
+    # Precompute cell shifts for each neighbor pair. 
+    # If we just want gradients wrt positions, this can live outside the model.
+    jax_structures["cell_shifts"] = get_cell_shifts(jax_structures)
+    
+    # jax_structures["pbcs"] = ...
+    return jax_structures
 
 
-def get_cartesian_vectors(jax_structures, cutoff_radius):
+def get_cartesian_vectors(positions, jax_structures):
 
-    labels = []
-    vectors = []
+    neighbor_list = jax_structures["neighbor_list"]
+    structure_numbers = neighbor_list[:, 0]
+    centers = neighbor_list[:, 1]
+    neighbors = neighbor_list[:, 2]
+    structure_offsets = jax_structures["structure_offsets"]
+    cell_shifts = jax_structures["cell_shifts"]
 
-    for structure_index in range(jax_structures.n_structures):
+    cartesian_vectors = positions[structure_offsets[structure_numbers]+neighbors] - positions[structure_offsets[structure_numbers]+centers] + cell_shifts
+    return cartesian_vectors
 
+
+def get_cell_shifts(jax_structures):
+
+    unit_cell_shifts = []
+    for i_structure in range(jax_structures["n_structures"]):
+        where_i_structure = jnp.nonzero(jax_structures["neighbor_list"][:, 0] == i_structure)[0]
+        neighbor_list_i_structure = jax_structures["neighbor_list"][where_i_structure]
+        cell_i_structure = jax_structures["cells"][i_structure]
+        unit_cell_shift_vectors = neighbor_list_i_structure[:, -3:]
+        unit_cell_shifts.append(
+            unit_cell_shift_vectors @ cell_i_structure  # Warning: it works but in a weird way when there is no cell
+        )
+    unit_cell_shifts = jnp.concatenate(unit_cell_shifts, axis=0)
+    return unit_cell_shifts
+
+
+def get_batched_neighbor_list(ase_structures, cutoff_radius):
+
+    batched_neighbor_list = []
+    for structure_index in range(len(ase_structures)):
         centers, neighbors, unit_cell_shift_vectors = get_neighbor_list(
-            jax_structures.ase_structures[structure_index],
+            ase_structures[structure_index],
             cutoff_radius
         )
-        where_selected_structure = jnp.where(jax_structures.structure_indices == structure_index)[0]
-        
-        positions = jax_structures.positions[where_selected_structure]
-        cell = jax_structures.cells[structure_index]
-        species = jax_structures.atomic_species[structure_index]
-        
-        structure_vectors, structure_labels = compute_cartesian_vectors_structure(
-            positions, 
-            centers,
-            neighbors,
-            unit_cell_shift_vectors,
-            cell, 
-            species, 
-            structure_index
-        )
+        species = ase_structures[structure_index].get_atomic_numbers()
+        structure_neighbor_list = jnp.stack([
+            jnp.array([structure_index]*len(centers)), 
+            centers, 
+            neighbors, 
+            species[centers], 
+            species[neighbors],
+            unit_cell_shift_vectors[:, 0],
+            unit_cell_shift_vectors[:, 1],
+            unit_cell_shift_vectors[:, 2]
+        ], axis=-1)
+        batched_neighbor_list.append(structure_neighbor_list)
 
-        vectors.append(structure_vectors)
-        labels.append(structure_labels)
-
-    vectors = jnp.concatenate(vectors, axis=0)
-    labels = jnp.concatenate(labels, axis=0)
-
-    return vectors, labels
-
-
-@jax.jit
-def compute_cartesian_vectors_structure(positions, centers, neighbors, unit_cell_shift_vectors, cell, species, structure_index):
-
-    structure_vectors = positions[neighbors] - positions[centers] + unit_cell_shift_vectors @ cell  # Warning: it works but in a weird way when there is no cell
-    structure_labels = jnp.stack([
-        jnp.array([structure_index]*len(centers)), 
-        centers, 
-        neighbors, 
-        species[centers], 
-        species[neighbors],
-        unit_cell_shift_vectors[:, 0],
-        unit_cell_shift_vectors[:, 1],
-        unit_cell_shift_vectors[:, 2]
-    ], axis=-1) # "structure", "center", "neighbor", "species_center", "species_neighbor", "cell_x", "cell_y", "cell_z"
-
-    return structure_vectors, structure_labels
+    batched_neighbor_list = jnp.concatenate(batched_neighbor_list, axis=0)
+    return batched_neighbor_list
 
 
 def get_neighbor_list(structure, cutoff_radius):

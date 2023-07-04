@@ -52,10 +52,12 @@ def compute_wk_nu1_iijj(vectors1, vectors2, equal_element_labels, l_max, C_s, la
     return wk_nu1_iijj
 
 
-def compute_wk_nu1(jax_structures1, jax_structures2, all_species, l_max, r_cut, C_s, lambda_s):
+def compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all_species, l_max, r_cut, C_s, lambda_s):
 
-    vectors1, labels1 = get_cartesian_vectors(jax_structures1, r_cut)
-    vectors2, labels2 = get_cartesian_vectors(jax_structures2, r_cut)
+    vectors1 = get_cartesian_vectors(positions1, jax_structures1)
+    vectors2 = get_cartesian_vectors(positions2, jax_structures2)
+    labels1 = jax_structures1["neighbor_list"]
+    labels2 = jax_structures2["neighbor_list"]
     
     # Get all pairs for which the center and neighbor elements are the same:
     equal_element_labels = get_equal_elements_labels(labels1[:, [3, 4]], labels2[:, [3, 4]])
