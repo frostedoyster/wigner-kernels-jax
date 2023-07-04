@@ -45,8 +45,9 @@ def compute_wk_nu1_iijj(vectors1, vectors2, equal_element_labels, l_max, C_s, la
         sh1_pairs_l = sh1_pairs[:, l**2:(l+1)**2]
         sh2_pairs_l = sh2_pairs[:, l**2:(l+1)**2]
         sbessi_l = sbessi[:, l]
-        # wk_nu1_iijj[l] = ((prefactors/(2*l+1))*((-1)**l)*sbessi_l)[:, None, None] * sh1_pairs_l[:, :, None] * sh2_pairs_l[:, None, :]
-        wk_nu1_iijj[l] = (prefactors*sbessi_l)[:, None, None] * sh1_pairs_l[:, :, None] * sh2_pairs_l[:, None, :]
+        wk_nu1_iijj[l] = ((prefactors/(2*l+1))*((-1)**l)*sbessi_l)[:, None, None] * sh1_pairs_l[:, :, None] * sh2_pairs_l[:, None, :]
+        # wk_nu1_iijj[l] = (prefactors*sbessi_l)[:, None, None] * sh1_pairs_l[:, :, None] * sh2_pairs_l[:, None, :]
+        # wk_nu1_iijj[l] = ((prefactors/(2*l+1))*sbessi_l)[:, None, None] * sh1_pairs_l[:, :, None] * sh2_pairs_l[:, None, :]
 
     return wk_nu1_iijj
 
