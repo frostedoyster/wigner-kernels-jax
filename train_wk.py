@@ -18,12 +18,12 @@ import tqdm
 
 
 np.random.seed(0)
-n_train = 15
-n_validation = 5
-n_test = 10
-batch_size = 5
-train_validation_structures = ase.io.read("datasets/gold.xyz", ":20")
-test_structures = ase.io.read("datasets/gold.xyz", "20:30")
+n_train = 100
+n_validation = 100
+n_test = 100
+batch_size = 20
+train_validation_structures = ase.io.read("datasets/gold.xyz", ":200")
+test_structures = ase.io.read("datasets/gold.xyz", "200:300")
 # structures = [ase.Atoms("H2", positions=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])]
 np.random.shuffle(train_validation_structures)
 train_structures = train_validation_structures[:n_train]
@@ -97,10 +97,12 @@ def compute_wks(structures1, structures2, batch_size):
 
             wks_single_batch = compute_wks_single_batch(jax_batch1["positions"], jax_batch2["positions"], jax_batch1, jax_batch2)
             wks = wks.at[idx1:idx1+jax_batch1["n_structures"], idx2:idx2+jax_batch2["n_structures"], :].set(wks_single_batch)
+            # print(jax.jacfwd(jax.jacrev(compute_wks_single_batch, argnums=0), argnums=1)(jax_batch1["positions"], jax_batch2["positions"], jax_batch1, jax_batch2).shape)
 
             idx2 += jax_batch2["n_structures"]
         idx1 += jax_batch1["n_structures"]
     return wks
+
 
 train_train_kernels = compute_wks(train_structures, train_structures, batch_size)
 validation_train_kernels = compute_wks(validation_structures, train_structures, batch_size)

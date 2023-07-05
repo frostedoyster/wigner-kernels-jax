@@ -10,8 +10,8 @@ from .dataset_processing import get_cartesian_vectors
 def compute_wk_nu0(jax_structures1, jax_structures2, all_species):
 
     wk_nu0_ii = {}
-    ai1 = jnp.concatenate(jax_structures1["atomic_species"])
-    ai2 = jnp.concatenate(jax_structures2["atomic_species"])
+    ai1 = jax_structures1["atomic_species"]
+    ai2 = jax_structures2["atomic_species"]
     s1 = jax_structures1["structure_indices"]
     s2 = jax_structures2["structure_indices"]
     s1_out = {}

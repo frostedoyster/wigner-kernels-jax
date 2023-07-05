@@ -31,7 +31,7 @@ def create_jax_structures(ase_atoms_structures, cutoff_radius):
     jax_structures["positions"] = jnp.array(jnp.concatenate(positions, axis=0))
     jax_structures["cells"] = jnp.array(cells)
     jax_structures["structure_indices"] = jnp.array(structure_indices)
-    jax_structures["atomic_species"] = atomic_species
+    jax_structures["atomic_species"] = jnp.concatenate(atomic_species, axis=0)
     jax_structures["neighbor_list"] = get_batched_neighbor_list(ase_atoms_structures, cutoff_radius)
 
     # Precompute cell shifts for each neighbor pair. 
@@ -42,6 +42,7 @@ def create_jax_structures(ase_atoms_structures, cutoff_radius):
     return jax_structures
 
 
+@jax.jit
 def get_cartesian_vectors(positions, jax_structures):
 
     neighbor_list = jax_structures["neighbor_list"]
