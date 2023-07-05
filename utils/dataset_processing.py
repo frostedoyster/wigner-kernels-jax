@@ -4,6 +4,7 @@ import ase
 import numpy as np
 
 
+# @profile
 def create_jax_structures(ase_atoms_structures, cutoff_radius):
 
     # This function essentially takes a list of ase.Atoms objects and converts
@@ -27,12 +28,12 @@ def create_jax_structures(ase_atoms_structures, cutoff_radius):
         atomic_species.append(atoms.get_atomic_numbers())
         pbcs.append(atoms.pbc)
 
-    jax_structures["structure_offsets"] = jnp.cumsum(np.array([0] + [len(structure) for structure in ase_atoms_structures]))
-    jax_structures["positions"] = jnp.array(jnp.concatenate(positions, axis=0))
+    jax_structures["structure_offsets"] = jnp.cumsum(jnp.array([0] + [len(structure) for structure in ase_atoms_structures]))
+    jax_structures["positions"] = jnp.concatenate(positions, axis=0)
     jax_structures["cells"] = jnp.array(cells)
     jax_structures["structure_indices"] = jnp.array(structure_indices)
     jax_structures["atomic_species"] = jnp.concatenate(atomic_species, axis=0)
-    jax_structures["neighbor_list"] = get_batched_neighbor_list(ase_atoms_structures, cutoff_radius)
+    jax_structures["neighbor_list"], jax_structures["batched_neighbor_list_structure_offsets"] = get_batched_neighbor_list(ase_atoms_structures, cutoff_radius)
 
     # Precompute cell shifts for each neighbor pair. 
     # If we just want gradients wrt positions, this can live outside the model.
@@ -58,10 +59,10 @@ def get_cartesian_vectors(positions, jax_structures):
 
 def get_cell_shifts(jax_structures):
 
+    nl_structure_offsets = jax_structures["batched_neighbor_list_structure_offsets"]
     unit_cell_shifts = []
     for i_structure in range(jax_structures["n_structures"]):
-        where_i_structure = jnp.nonzero(jax_structures["neighbor_list"][:, 0] == i_structure)[0]
-        neighbor_list_i_structure = jax_structures["neighbor_list"][where_i_structure]
+        neighbor_list_i_structure = jax_structures["neighbor_list"][nl_structure_offsets[i_structure]:nl_structure_offsets[i_structure+1]]
         cell_i_structure = jax_structures["cells"][i_structure]
         unit_cell_shift_vectors = neighbor_list_i_structure[:, -3:]
         unit_cell_shifts.append(
@@ -74,6 +75,7 @@ def get_cell_shifts(jax_structures):
 def get_batched_neighbor_list(ase_structures, cutoff_radius):
 
     batched_neighbor_list = []
+    batched_neighbor_list_structure_offsets = []
     for structure_index in range(len(ase_structures)):
         centers, neighbors, unit_cell_shift_vectors = get_neighbor_list(
             ase_structures[structure_index],
@@ -91,9 +93,11 @@ def get_batched_neighbor_list(ase_structures, cutoff_radius):
             unit_cell_shift_vectors[:, 2]
         ], axis=-1)
         batched_neighbor_list.append(structure_neighbor_list)
+        batched_neighbor_list_structure_offsets.append(structure_neighbor_list.shape[0])
 
     batched_neighbor_list = jnp.concatenate(batched_neighbor_list, axis=0)
-    return batched_neighbor_list
+    batched_neighbor_list_structure_offsets = jnp.cumsum(jnp.array([0] + batched_neighbor_list_structure_offsets))
+    return batched_neighbor_list, batched_neighbor_list_structure_offsets
 
 
 def get_neighbor_list(structure, cutoff_radius):

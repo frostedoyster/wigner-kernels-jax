@@ -88,12 +88,20 @@ def compute_wks(structures1, structures2, batch_size):
 
     jax_batches1 = [create_jax_structures(batch, r_cut) for batch in batches1]
     jax_batches2 = [create_jax_structures(batch, r_cut) for batch in batches2]
+    """jax_batches1 = []
+    for batch in tqdm.tqdm(batches1):
+        jax_batches1.append(create_jax_structures(batch, r_cut))
+
+    jax_batches2 = []
+    for batch in tqdm.tqdm(batches2):
+        jax_batches2.append(create_jax_structures(batch, r_cut))"""
+        
 
     wks = jnp.empty((ntot1, ntot2, nu_max+1))
     idx1 = 0
     for jax_batch1 in tqdm.tqdm(jax_batches1):
         idx2 = 0
-        for jax_batch2 in jax_batches2:
+        for jax_batch2 in jax_batches2:#tqdm.tqdm(jax_batches2):
 
             wks_single_batch = compute_wks_single_batch(jax_batch1["positions"], jax_batch2["positions"], jax_batch1, jax_batch2)
             wks = wks.at[idx1:idx1+jax_batch1["n_structures"], idx2:idx2+jax_batch2["n_structures"], :].set(wks_single_batch)

@@ -110,8 +110,8 @@ def compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all
         index_ai_begin, index_ai_end = ai_splits[a_i]
         S1_ai_pairs = S1_pairs[index_ai_begin:index_ai_end]
         S2_ai_pairs = S2_pairs[index_ai_begin:index_ai_end]
-        i1_ai_pairs = S1_pairs[index_ai_begin:index_ai_end]
-        i2_ai_pairs = S2_pairs[index_ai_begin:index_ai_end]
+        i1_ai_pairs = i1_pairs[index_ai_begin:index_ai_end]
+        i2_ai_pairs = i2_pairs[index_ai_begin:index_ai_end]
 
         where_ai_1 = jnp.where(atomic_species_1==a_i)[0]
         where_ai_2 = jnp.where(atomic_species_2==a_i)[0]
