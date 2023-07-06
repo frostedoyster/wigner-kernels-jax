@@ -4,7 +4,6 @@ import ase
 import numpy as np
 
 
-# @profile
 def create_jax_structures(ase_atoms_structures, cutoff_radius):
 
     # This function essentially takes a list of ase.Atoms objects and converts
@@ -28,16 +27,26 @@ def create_jax_structures(ase_atoms_structures, cutoff_radius):
         atomic_species.append(atoms.get_atomic_numbers())
         pbcs.append(atoms.pbc)
 
-    jax_structures["structure_offsets"] = jnp.cumsum(jnp.array([0] + [len(structure) for structure in ase_atoms_structures]))
-    jax_structures["positions"] = jnp.concatenate(positions, axis=0)
-    jax_structures["cells"] = jnp.array(cells)
-    jax_structures["structure_indices"] = jnp.array(structure_indices)
-    jax_structures["atomic_species"] = jnp.concatenate(atomic_species, axis=0)
-    jax_structures["neighbor_list"], jax_structures["batched_neighbor_list_structure_offsets"] = get_batched_neighbor_list(ase_atoms_structures, cutoff_radius)
+    structure_offsets = np.cumsum([0] + [len(structure) for structure in ase_atoms_structures])
+    cells = np.array(cells)
+    positions = np.concatenate(positions, axis=0)
+    structure_indices = np.array(structure_indices)
+    atomic_species = np.concatenate(atomic_species, axis=0)
+    neighbor_list, batched_neighbor_list_structure_offsets = get_batched_neighbor_list(ase_atoms_structures, cutoff_radius)
 
     # Precompute cell shifts for each neighbor pair. 
     # If we just want gradients wrt positions, this can live outside the model.
-    jax_structures["cell_shifts"] = get_cell_shifts(jax_structures)
+    cell_shifts = get_cell_shifts(batched_neighbor_list_structure_offsets, jax_structures["n_structures"], neighbor_list, cells)
+
+    # Transform everything into jax arrays (probably on GPU):
+    jax_structures["structure_offsets"] = jnp.array(structure_offsets)
+    jax_structures["positions"] = jnp.array(positions)
+    jax_structures["cells"] = jnp.array(cells)
+    jax_structures["structure_indices"] = jnp.array(structure_indices)
+    jax_structures["atomic_species"] = jnp.array(atomic_species)
+    jax_structures["neighbor_list"] = jnp.array(neighbor_list)
+    jax_structures["batched_neighbor_list_structure_offsets"] = jnp.array(batched_neighbor_list_structure_offsets)
+    jax_structures["cell_shifts"] = cell_shifts
     
     # jax_structures["pbcs"] = ...
     return jax_structures
@@ -57,13 +66,12 @@ def get_cartesian_vectors(positions, jax_structures):
     return cartesian_vectors
 
 
-def get_cell_shifts(jax_structures):
+def get_cell_shifts(nl_structure_offsets, n_structures, neighbor_list, cells):
 
-    nl_structure_offsets = jax_structures["batched_neighbor_list_structure_offsets"]
     unit_cell_shifts = []
-    for i_structure in range(jax_structures["n_structures"]):
-        neighbor_list_i_structure = jax_structures["neighbor_list"][nl_structure_offsets[i_structure]:nl_structure_offsets[i_structure+1]]
-        cell_i_structure = jax_structures["cells"][i_structure]
+    for i_structure in range(n_structures):
+        neighbor_list_i_structure = neighbor_list[nl_structure_offsets[i_structure]:nl_structure_offsets[i_structure+1]]
+        cell_i_structure = cells[i_structure]
         unit_cell_shift_vectors = neighbor_list_i_structure[:, -3:]
         unit_cell_shifts.append(
             unit_cell_shift_vectors @ cell_i_structure  # Warning: it works but in a weird way when there is no cell

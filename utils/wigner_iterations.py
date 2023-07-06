@@ -52,7 +52,7 @@ def compute_wks_high_order(wks_nu1, all_species, nu_max, l_max, cgs):
     equivariant_wks = [0, wks_nu1]
 
     for nu in range(2, nu_max+1):
-        full = True if nu <= jnp.ceil(nu_max/2) else False
+        full = True if nu <= int(jnp.ceil(nu_max/2)) else False
         
         if full:
             wks_nu = iterate_wigner_kernels(equivariant_wks[nu-1], wks_nu1, cgs, l_max, full=True)
