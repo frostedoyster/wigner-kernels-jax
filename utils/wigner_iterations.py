@@ -1,3 +1,4 @@
+import numpy as np
 import jax
 import jax.numpy as jnp
 
@@ -18,6 +19,7 @@ def perform_wigner_operation(wk1, wk2, cg_tensor, l1, l2, L):
     return result
 
 
+@partial(jax.jit, static_argnames=("l_max", "full"))
 def iterate_wigner_kernels(wks1, wks2, cgs, l_max, full=True):
 
     # We assume that wks1 and wks2 have the same a_i keys: there should be no exceptions
@@ -42,6 +44,7 @@ def iterate_wigner_kernels(wks1, wks2, cgs, l_max, full=True):
     return wks_out
 
 
+@partial(jax.jit, static_argnames=("all_species", "nu_max", "l_max"))
 def compute_wks_high_order(wks_nu1, all_species, nu_max, l_max, cgs):
 
     invariant_wks_nu1 = {}
@@ -52,13 +55,13 @@ def compute_wks_high_order(wks_nu1, all_species, nu_max, l_max, cgs):
     equivariant_wks = [0, wks_nu1]
 
     for nu in range(2, nu_max+1):
-        full = True if nu <= int(jnp.ceil(nu_max/2)) else False
+        full = True if nu <= int(np.ceil(nu_max/2)) else False
         
         if full:
             wks_nu = iterate_wigner_kernels(equivariant_wks[nu-1], wks_nu1, cgs, l_max, full=True)
             equivariant_wks.append(wks_nu)
         else:
-            wks_nu = iterate_wigner_kernels(equivariant_wks[int(jnp.ceil(nu_max/2))], equivariant_wks[nu-int(jnp.ceil(nu_max/2))], cgs, l_max, full=True)
+            wks_nu = iterate_wigner_kernels(equivariant_wks[int(np.ceil(nu_max/2))], equivariant_wks[nu-int(np.ceil(nu_max/2))], cgs, l_max, full=True)
 
         invariant_wks_nu = {}
         for a_i in all_species:
