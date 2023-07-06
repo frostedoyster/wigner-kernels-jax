@@ -7,6 +7,7 @@ from .special_functions import spherical_harmonics, scaled_spherical_bessel_i
 from .dataset_processing import get_cartesian_vectors
 
 
+@partial(jax.jit, static_argnames="all_species")
 def compute_wk_nu0(jax_structures1, jax_structures2, all_species):
 
     wk_nu0_ii = {}

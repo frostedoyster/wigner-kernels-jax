@@ -1,3 +1,4 @@
+import numpy as np
 import jax
 import jax.numpy as jnp
 
@@ -13,13 +14,12 @@ def sigma(r, C_s, lambda_s):
     return C_s*jnp.exp(r/lambda_s)
 
 
+@partial(jax.jit, static_argnames="all_species")
 def get_equal_element_pair_labels(aiaj1, aiaj2, all_species):
     # gets all pairs of indices for which ai1=ai2 and aj1=aj2
     # slightly involved approach, but it should scale linearly and not quadratically
 
     same_aiaj_pairs = []
-    ai_splits = {}
-    index_now = 0
     for ai in all_species:
         for aj in all_species:
             where_aiaj_1 = aiaj1[(ai, aj)]
@@ -28,11 +28,9 @@ def get_equal_element_pair_labels(aiaj1, aiaj2, all_species):
             tile_2 = jnp.tile(where_aiaj_2, where_aiaj_1.shape[0])
             same_aiaj_pairs_ai = jnp.stack((repeat_1, tile_2), axis=1)
             same_aiaj_pairs.append(same_aiaj_pairs_ai)
-            ai_splits[ai] = (index_now, index_now+same_aiaj_pairs_ai.shape[0])
-            index_now += same_aiaj_pairs_ai.shape[0]
     
     same_aiaj_pairs = jnp.concatenate(same_aiaj_pairs, axis=0)
-    return same_aiaj_pairs, ai_splits
+    return same_aiaj_pairs
 
 
 @partial(jax.jit, static_argnames="l_max")
@@ -69,6 +67,7 @@ def compute_wk_nu1_iijj(vectors1, vectors2, equal_element_pair_labels, l_max, C_
     return wk_nu1_iijj
 
 
+@partial(jax.jit, static_argnames=["all_species", "l_max"])
 def compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all_species, l_max, r_cut, C_s, lambda_s):
 
     vectors1 = get_cartesian_vectors(positions1, jax_structures1)
@@ -85,7 +84,8 @@ def compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all
     nl_indices_per_element_pair_2 = jax_structures2["nl_indices_per_element_pair"]
     
     # Get all pairs for which the center and neighbor elements are the same:
-    equal_element_pair_labels, ai_splits = get_equal_element_pair_labels(nl_indices_per_element_pair_1, nl_indices_per_element_pair_2, all_species)
+    equal_element_pair_labels = get_equal_element_pair_labels(nl_indices_per_element_pair_1, nl_indices_per_element_pair_2, all_species)
+    ai_splits = np.cumsum([np.sum([nl_indices_per_element_pair_1[(ai, aj)].shape[0]*nl_indices_per_element_pair_2[(ai, aj)].shape[0] for aj in all_species]) for ai in all_species])[:-1]
     wk_iijj = compute_wk_nu1_iijj(vectors1, vectors2, equal_element_pair_labels, l_max, C_s, lambda_s)
 
     wk_nu1_ii = {}
@@ -97,13 +97,19 @@ def compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all
     i1_pairs = labels1[equal_element_pair_labels[:, 0], 1]
     i2_pairs = labels2[equal_element_pair_labels[:, 1], 1]
 
-    for a_i in all_species:
+    S1_pairs = jnp.split(S1_pairs, ai_splits)
+    S2_pairs = jnp.split(S2_pairs, ai_splits)
+    i1_pairs = jnp.split(i1_pairs, ai_splits)
+    i2_pairs = jnp.split(i2_pairs, ai_splits)
 
-        index_ai_begin, index_ai_end = ai_splits[a_i]
-        S1_ai_pairs = S1_pairs[index_ai_begin:index_ai_end]
-        S2_ai_pairs = S2_pairs[index_ai_begin:index_ai_end]
-        i1_ai_pairs = i1_pairs[index_ai_begin:index_ai_end]
-        i2_ai_pairs = i2_pairs[index_ai_begin:index_ai_end]
+    wk_iijj = {l : jnp.split(wk_iijj[l], ai_splits) for l in range(l_max+1)}
+
+    for ai_idx, a_i in enumerate(all_species):
+
+        S1_ai_pairs = S1_pairs[ai_idx]
+        S2_ai_pairs = S2_pairs[ai_idx]
+        i1_ai_pairs = i1_pairs[ai_idx]
+        i2_ai_pairs = i2_pairs[ai_idx]
 
         where_ai_1 = atomic_indices_per_element_1[a_i]
         where_ai_2 = atomic_indices_per_element_2[a_i]
@@ -121,7 +127,7 @@ def compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all
             wk_nu1_ii[a_i][(l, 1)] = jax.lax.scatter_add(
                 jnp.zeros((n_i_ai_1*n_i_ai_2, 2*l+1, 2*l+1)),
                 jnp.expand_dims(indices_iijj_to_ii, -1),
-                wk_iijj[l][index_ai_begin:index_ai_end],
+                wk_iijj[l][ai_idx],
                 jax.lax.ScatterDimensionNumbers(update_window_dims=(1, 2), inserted_window_dims=(0,), scatter_dims_to_operand_dims=(0,))
             ).reshape((n_i_ai_1, n_i_ai_2, 2*l+1, 2*l+1))
 
