@@ -78,6 +78,8 @@ def compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all
     S2 = jax_structures2["structure_indices"]
     structure_offsets_1 = jax_structures1["structure_offsets"]
     structure_offsets_2 = jax_structures2["structure_offsets"]
+    positions_in_ai_vector_1 = jax_structures1["positions_in_ai_vector"]
+    positions_in_ai_vector_2 = jax_structures2["positions_in_ai_vector"]
     atomic_indices_per_element_1 = jax_structures1["atomic_indices_per_element"]
     atomic_indices_per_element_2 = jax_structures2["atomic_indices_per_element"]
     nl_indices_per_element_pair_1 = jax_structures1["nl_indices_per_element_pair"]
@@ -118,8 +120,8 @@ def compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all
         s1_ai = S1[where_ai_1]
         s2_ai = S2[where_ai_2]
 
-        ij_to_i_1 = structure_offsets_1[S1_ai_pairs] + i1_ai_pairs
-        ij_to_i_2 = structure_offsets_2[S2_ai_pairs] + i2_ai_pairs
+        ij_to_i_1 = positions_in_ai_vector_1[structure_offsets_1[S1_ai_pairs] + i1_ai_pairs]
+        ij_to_i_2 = positions_in_ai_vector_2[structure_offsets_2[S2_ai_pairs] + i2_ai_pairs]
         indices_iijj_to_ii = n_i_ai_2*ij_to_i_1+ij_to_i_2
 
         wk_nu1_ii[a_i] = {}

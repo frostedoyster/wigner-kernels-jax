@@ -19,13 +19,19 @@ def create_jax_structures(ase_atoms_structures, all_species, cutoff_radius):
     atomic_species = []
     pbcs = []
 
+    positions_in_ai_vector = []
+    piav_counters = {a_i : 0 for a_i in all_species}
     for structure_index, atoms in enumerate(ase_atoms_structures):
         positions.append(atoms.positions)
         cells.append(atoms.cell)
-        for _ in range(atoms.positions.shape[0]):
+        atomic_species_structure = atoms.get_atomic_numbers()
+        atomic_species.append(atomic_species_structure)
+        for atom_index in range(atoms.positions.shape[0]):
             structure_indices.append(structure_index)
-        atomic_species.append(atoms.get_atomic_numbers())
+            positions_in_ai_vector.append(piav_counters[atomic_species_structure[atom_index]])
+            piav_counters[atomic_species_structure[atom_index]] += 1
         pbcs.append(atoms.pbc)
+    positions_in_ai_vector = np.array(positions_in_ai_vector)
 
     structure_offsets = np.cumsum([0] + [len(structure) for structure in ase_atoms_structures])
     cells = np.array(cells)
@@ -63,6 +69,7 @@ def create_jax_structures(ase_atoms_structures, all_species, cutoff_radius):
     jax_structures["atomic_species"] = jnp.array(atomic_species)
     jax_structures["neighbor_list"] = jnp.array(neighbor_list)
     jax_structures["batched_neighbor_list_structure_offsets"] = jnp.array(batched_neighbor_list_structure_offsets)
+    jax_structures["positions_in_ai_vector"] = jnp.array(positions_in_ai_vector)
     jax_structures["cell_shifts"] = cell_shifts
     jax_structures["atomic_indices_per_element"] = atomic_indices_per_element
     jax_structures["nl_indices_per_element_pair"] = nl_indices_per_element_pair
