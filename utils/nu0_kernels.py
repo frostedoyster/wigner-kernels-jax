@@ -10,17 +10,17 @@ from .dataset_processing import get_cartesian_vectors
 def compute_wk_nu0(jax_structures1, jax_structures2, all_species):
 
     wk_nu0_ii = {}
-    ai1 = jax_structures1["atomic_species"]
-    ai2 = jax_structures2["atomic_species"]
     s1 = jax_structures1["structure_indices"]
     s2 = jax_structures2["structure_indices"]
+    where_ai1 = jax_structures1["atomic_indices_per_element"]
+    where_ai2 = jax_structures2["atomic_indices_per_element"]
     s1_out = {}
     s2_out = {}
 
     for a_i in all_species:
 
-        ai1_indices = jnp.nonzero(ai1==a_i)[0]
-        ai2_indices = jnp.nonzero(ai2==a_i)[0]
+        ai1_indices = where_ai1[a_i]
+        ai2_indices = where_ai2[a_i]
         n1 = ai1_indices.shape[0]
         n2 = ai2_indices.shape[0]
         s1_ai = s1[ai1_indices]

@@ -23,15 +23,21 @@ n_train = 100
 n_validation = 100
 n_test = 100
 batch_size = 40
-all_structures = ase.io.read("datasets/qm9.xyz", ":")
+"""all_structures = ase.io.read("datasets/qm9.xyz", ":")
 np.random.shuffle(all_structures)
 train_structures = all_structures[:n_train]
 validation_structures = all_structures[n_train:n_train+n_validation]
-test_structures = all_structures[n_train+n_validation:n_train+n_validation+n_test]
+test_structures = all_structures[n_train+n_validation:n_train+n_validation+n_test]"""
+train_structures = ase.io.read("datasets/gold.xyz", ":100")
+validation_structures = ase.io.read("datasets/gold.xyz", "100:200")
+test_structures = ase.io.read("datasets/gold.xyz", "200:300")
+train_targets = jnp.array([train_structure.info["elec. Free Energy [eV]"] for train_structure in train_structures])
+validation_targets = jnp.array([validation_structure.info["elec. Free Energy [eV]"] for validation_structure in validation_structures])
+test_targets = jnp.array([test_structure.info["elec. Free Energy [eV]"] for test_structure in test_structures])
 
-train_targets = jnp.array([train_structure.info["U0"] for train_structure in train_structures])
+"""train_targets = jnp.array([train_structure.info["U0"] for train_structure in train_structures])
 validation_targets = jnp.array([validation_structure.info["U0"] for validation_structure in validation_structures])
-test_targets = jnp.array([test_structure.info["U0"] for test_structure in test_structures])
+test_targets = jnp.array([test_structure.info["U0"] for test_structure in test_structures])"""
 
 def split_list(lst, n):
     """Yields successive n-sized chunks from lst."""
@@ -86,7 +92,7 @@ def compute_wks_single_batch(positions1, positions2, jax_structures1, jax_struct
     invariant_wks_per_structure = jnp.stack(invariant_wks_per_structure, axis=-1)
     return invariant_wks_per_structure 
 
-@profile
+# @profile
 def compute_wks(structures1, structures2, batch_size):
     batches1 = split_list(structures1, batch_size)
     batches2 = split_list(structures2, batch_size)
@@ -95,8 +101,8 @@ def compute_wks(structures1, structures2, batch_size):
     ntot1 = sum(n1)
     ntot2 = sum(n2)
 
-    jax_batches1 = [create_jax_structures(batch, r_cut) for batch in batches1]
-    jax_batches2 = [create_jax_structures(batch, r_cut) for batch in batches2]
+    jax_batches1 = [create_jax_structures(batch, all_species, r_cut) for batch in batches1]
+    jax_batches2 = [create_jax_structures(batch, all_species, r_cut) for batch in batches2]
     """jax_batches1 = []
     for batch in tqdm.tqdm(batches1):
         jax_batches1.append(create_jax_structures(batch, r_cut))
@@ -117,7 +123,7 @@ def compute_wks(structures1, structures2, batch_size):
             # print(jax.jacfwd(jax.jacrev(compute_wks_single_batch, argnums=0), argnums=1)(jax_batch1["positions"], jax_batch2["positions"], jax_batch1, jax_batch2).shape)
 
             idx2 += jax_batch2["n_structures"]
-        exit()
+        # exit()
         idx1 += jax_batch1["n_structures"]
     return wks
 

@@ -4,7 +4,7 @@ import ase
 import numpy as np
 
 
-def create_jax_structures(ase_atoms_structures, cutoff_radius):
+def create_jax_structures(ase_atoms_structures, all_species, cutoff_radius):
 
     # This function essentially takes a list of ase.Atoms objects and converts
     # all the relevant data into a dictionary of jax data structures
@@ -34,6 +34,23 @@ def create_jax_structures(ase_atoms_structures, cutoff_radius):
     atomic_species = np.concatenate(atomic_species, axis=0)
     neighbor_list, batched_neighbor_list_structure_offsets = get_batched_neighbor_list(ase_atoms_structures, cutoff_radius)
 
+    atomic_indices_per_element = {}
+    for a_i in all_species:
+        atomic_indices_per_element[a_i] = jnp.array(np.nonzero(atomic_species==a_i)[0])
+
+    ai = neighbor_list[:, 3]
+    aj = neighbor_list[:, 4]
+    is_ai = {}
+    is_aj = {}
+    for a in all_species:
+        is_ai[a] = (ai == a)
+        is_aj[a] = (aj == a)
+    nl_indices_per_element_pair = {}
+    for a_i in all_species:
+        for a_j in all_species:
+            nl_indices_per_element_pair[(a_i, a_j)] = jnp.array(np.nonzero(np.logical_and(is_ai[a_i], is_aj[a_j]))[0])
+
+
     # Precompute cell shifts for each neighbor pair. 
     # If we just want gradients wrt positions, this can live outside the model.
     cell_shifts = get_cell_shifts(batched_neighbor_list_structure_offsets, jax_structures["n_structures"], neighbor_list, cells)
@@ -47,6 +64,8 @@ def create_jax_structures(ase_atoms_structures, cutoff_radius):
     jax_structures["neighbor_list"] = jnp.array(neighbor_list)
     jax_structures["batched_neighbor_list_structure_offsets"] = jnp.array(batched_neighbor_list_structure_offsets)
     jax_structures["cell_shifts"] = cell_shifts
+    jax_structures["atomic_indices_per_element"] = atomic_indices_per_element
+    jax_structures["nl_indices_per_element_pair"] = nl_indices_per_element_pair
     
     # jax_structures["pbcs"] = ...
     return jax_structures

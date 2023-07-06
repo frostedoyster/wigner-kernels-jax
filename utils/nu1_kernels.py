@@ -13,27 +13,17 @@ def sigma(r, C_s, lambda_s):
     return C_s*jnp.exp(r/lambda_s)
 
 
-def get_equal_element_pair_labels(ai1, aj1, ai2, aj2, all_species):
+def get_equal_element_pair_labels(aiaj1, aiaj2, all_species):
     # gets all pairs of indices for which ai1=ai2 and aj1=aj2
     # slightly involved approach, but it should scale linearly and not quadratically
-
-    is_ai1 = {}
-    is_aj1 = {}
-    is_ai2 = {}
-    is_aj2 = {}
-    for a in all_species:
-        is_ai1[a] = (ai1 == a)
-        is_aj1[a] = (aj1 == a)
-        is_ai2[a] = (ai2 == a)
-        is_aj2[a] = (aj2 == a)
 
     same_aiaj_pairs = []
     ai_splits = {}
     index_now = 0
     for ai in all_species:
         for aj in all_species:
-            where_aiaj_1 = jnp.nonzero(jnp.logical_and(is_ai1[ai], is_aj1[aj]))[0]
-            where_aiaj_2 = jnp.nonzero(jnp.logical_and(is_ai2[ai], is_aj2[aj]))[0]
+            where_aiaj_1 = aiaj1[(ai, aj)]
+            where_aiaj_2 = aiaj2[(ai, aj)]
             repeat_1 = jnp.repeat(where_aiaj_1, where_aiaj_2.shape[0])
             tile_2 = jnp.tile(where_aiaj_2, where_aiaj_1.shape[0])
             same_aiaj_pairs_ai = jnp.stack((repeat_1, tile_2), axis=1)
@@ -89,11 +79,13 @@ def compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all
     S2 = jax_structures2["structure_indices"]
     structure_offsets_1 = jax_structures1["structure_offsets"]
     structure_offsets_2 = jax_structures2["structure_offsets"]
-    atomic_species_1 = jax_structures1["atomic_species"]
-    atomic_species_2 = jax_structures2["atomic_species"]
+    atomic_indices_per_element_1 = jax_structures1["atomic_indices_per_element"]
+    atomic_indices_per_element_2 = jax_structures2["atomic_indices_per_element"]
+    nl_indices_per_element_pair_1 = jax_structures1["nl_indices_per_element_pair"]
+    nl_indices_per_element_pair_2 = jax_structures2["nl_indices_per_element_pair"]
     
     # Get all pairs for which the center and neighbor elements are the same:
-    equal_element_pair_labels, ai_splits = get_equal_element_pair_labels(labels1[:, 3], labels1[:, 4], labels2[:, 3], labels2[:, 4], all_species)
+    equal_element_pair_labels, ai_splits = get_equal_element_pair_labels(nl_indices_per_element_pair_1, nl_indices_per_element_pair_2, all_species)
     wk_iijj = compute_wk_nu1_iijj(vectors1, vectors2, equal_element_pair_labels, l_max, C_s, lambda_s)
 
     wk_nu1_ii = {}
@@ -113,8 +105,8 @@ def compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all
         i1_ai_pairs = i1_pairs[index_ai_begin:index_ai_end]
         i2_ai_pairs = i2_pairs[index_ai_begin:index_ai_end]
 
-        where_ai_1 = jnp.where(atomic_species_1==a_i)[0]
-        where_ai_2 = jnp.where(atomic_species_2==a_i)[0]
+        where_ai_1 = atomic_indices_per_element_1[a_i]
+        where_ai_2 = atomic_indices_per_element_2[a_i]
         n_i_ai_1 = where_ai_1.shape[0]
         n_i_ai_2 = where_ai_2.shape[0]
         s1_ai = S1[where_ai_1]
