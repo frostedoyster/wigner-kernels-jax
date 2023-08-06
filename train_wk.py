@@ -12,24 +12,24 @@ from functools import partial
 
 from utils.clebsch_gordan import get_cg_coefficients
 from utils.error_measures import get_mae, get_rmse
-from utils.wigner_kernels import compute_wks, compute_wks_symm
+from utils.wigner_kernels import compute_wks
 
 import tqdm
 
 np.random.seed(0)
-n_train = 450
-n_validation = 50
-n_test = 1000
+n_train = 100
+n_validation = 100
+n_test = 100
 batch_size = 50
 
-train_validation_structures = ase.io.read("datasets/ethanol1.extxyz", "0:1000")
-test_structures = ase.io.read("datasets/ethanol1.extxyz", "1000:2000")
+train_validation_structures = ase.io.read("datasets/qm9.xyz", ":")
 np.random.shuffle(train_validation_structures)
 train_structures = train_validation_structures[:n_train]
 validation_structures = train_validation_structures[n_train:n_train+n_validation]
-train_targets = jnp.array([train_structure.info["energy"] for train_structure in train_structures])
-validation_targets = jnp.array([validation_structure.info["energy"] for validation_structure in validation_structures])
-test_targets = jnp.array([test_structure.info["energy"] for test_structure in test_structures])
+test_structures = train_validation_structures[n_train+n_validation:n_train+n_validation+n_test]
+train_targets = jnp.array([train_structure.info["U0"] for train_structure in train_structures])
+validation_targets = jnp.array([validation_structure.info["U0"] for validation_structure in validation_structures])
+test_targets = jnp.array([test_structure.info["U0"] for test_structure in test_structures])
 
 all_species_jax = jnp.sort(jnp.unique(jnp.concatenate(
         [train_structure.numbers for train_structure in train_structures] + 
@@ -42,10 +42,10 @@ nu_max = 4
 l_max = 3
 cgs = get_cg_coefficients(l_max)
 r_cut = 10.0
-C_s = 0.1
-lambda_s = jnp.array([0.0, 0.31, 0.0, 0.0, 0.0, 0.0, 0.75, 0.0, 0.66])
+C_s = jnp.array([0.0, 0.31, 0.0, 0.0, 0.0, 0.0, 0.75, 0.71, 0.66, 0.57]) * 0.03
+lambda_s = jnp.array([0.0, 0.31, 0.0, 0.0, 0.0, 0.0, 0.75, 0.71, 0.66, 0.57]) * 0.5
 
-train_train_kernels = compute_wks_symm(train_structures, all_species, r_cut, l_max, nu_max, cgs, batch_size, C_s, lambda_s)
+train_train_kernels = compute_wks(train_structures, train_structures, all_species, r_cut, l_max, nu_max, cgs, batch_size, C_s, lambda_s)
 for nu in range(nu_max+1):
     print(train_train_kernels[:, :, nu])
     print()

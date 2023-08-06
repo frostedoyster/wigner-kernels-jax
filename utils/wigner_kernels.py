@@ -17,7 +17,7 @@ def split_list(lst, n):
     return list_of_chunks
 
 
-@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s"])
+@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max"])
 def compute_wks_single_batch(positions_1, positions_2, jax_structures_1, jax_structures_2, n1, n2, all_species, l_max, nu_max, cgs, C_s, lambda_s):
 
     wks_nu0, s1_0, s2_0 = compute_wk_nu0(jax_structures_1, jax_structures_2, all_species)
@@ -40,27 +40,27 @@ def compute_wks_single_batch(positions_1, positions_2, jax_structures_1, jax_str
     return invariant_wks_per_structure
 
 
-@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s"])
+@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max"])
 def compute_wks_single_batch_sum_1(positions_1, positions_2, jax_structures_1, jax_structures_2, n1, n2, all_species, l_max, nu_max, cgs, C_s, lambda_s):
     wks_single_batch = compute_wks_single_batch(positions_1, positions_2, jax_structures_1, jax_structures_2, n1, n2, all_species, l_max, nu_max, cgs, C_s, lambda_s)
     return jnp.sum(wks_single_batch, axis=0)
 
 compute_wks_single_batch_jac_1 = jax.jit(
     jax.jacrev(compute_wks_single_batch_sum_1, argnums=0),
-    static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s"]
+    static_argnames=["n1", "n2", "all_species", "l_max", "nu_max"]
 )
 
-@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s"])
+@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max"])
 def compute_wks_single_batch_sum_2(positions_1, positions_2, jax_structures_1, jax_structures_2, n1, n2, all_species, l_max, nu_max, cgs, C_s, lambda_s):
     wks_single_batch = compute_wks_single_batch(positions_1, positions_2, jax_structures_1, jax_structures_2, n1, n2, all_species, l_max, nu_max, cgs, C_s, lambda_s)
     return jnp.sum(wks_single_batch, axis=1)
 
 compute_wks_single_batch_jac_2 = jax.jit(
     jax.jacrev(compute_wks_single_batch_sum_2, argnums=1),
-    static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s"]
+    static_argnames=["n1", "n2", "all_species", "l_max", "nu_max"]
 )
 
-@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s"])
+@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max"])
 def compute_wks_single_batch_sum_1_2(positions_1, positions_2, jax_structures_1, jax_structures_2, n1, n2, all_species, l_max, nu_max, cgs, C_s, lambda_s):
     wks_single_batch = compute_wks_single_batch(positions_1, positions_2, jax_structures_1, jax_structures_2, n1, n2, all_species, l_max, nu_max, cgs, C_s, lambda_s)
     return jnp.sum(wks_single_batch, axis=(0, 1))
@@ -73,7 +73,7 @@ compute_wks_single_batch_hess = jax.jit(
         ),
         argnums=1
     ),
-    static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s"]
+    static_argnames=["n1", "n2", "all_species", "l_max", "nu_max"]
 )
 
 

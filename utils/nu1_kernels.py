@@ -11,7 +11,7 @@ from .dataset_processing import get_cartesian_vectors
 # @jax.jit
 @partial(jax.vmap, in_axes=(0, None, None, 0))
 def sigma(r, C_s, lambda_s, species):
-    return C_s*jnp.exp(r/(lambda_s[species[0]]+lambda_s[species[1]]))
+    return (C_s[species[0]]+C_s[species[1]])*jnp.exp(r/(lambda_s[species[0]]+lambda_s[species[1]]))
 
 
 # @partial(jax.jit, static_argnames="all_species")
