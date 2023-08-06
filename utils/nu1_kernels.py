@@ -49,9 +49,13 @@ def compute_wk_nu1_iijj(vectors1, vectors2, equal_element_pair_labels, l_max, C_
 
     A = 1.0/(sigma(r1_pairs, C_s, lambda_s)**2+sigma(r2_pairs, C_s, lambda_s)**2)
 
-    prefactors = 32.0*(jnp.pi)**3*(A/(2.0*jnp.pi))**(3/2)*jnp.exp(-A*(r2_pairs-r1_pairs)**2/2.0)
-    sbessi = scaled_spherical_bessel_i(A*r1_pairs*r2_pairs, l_max)
+    # Gaussians L1:
+    prefactors = 32.0*(jnp.pi)**3*(A/(2.0*jnp.pi))**(3/2)*jnp.exp(-A*(r2_pairs-r1_pairs)**2/2.0) #* jnp.exp(-r1_pairs/lambda_s)*jnp.exp(-r2_pairs/lambda_s)
+    
+    # Gaussians L2:
+    # ?????? prefactors = 32.0*(jnp.pi)**3*(A/(2.0*jnp.pi))**(3/2)*jnp.exp(-A*(r2_pairs-r1_pairs)**2/2.0) #*jnp.exp(-r1_pairs/lambda_s)*jnp.exp(-r2_pairs/lambda_s)
 
+    sbessi = scaled_spherical_bessel_i(A*r1_pairs*r2_pairs, l_max)
     sh_splits = [l**2 for l in range(1, l_max+1)]
     sh1_pairs = jnp.split(sh1_pairs, sh_splits, axis=1)
     sh2_pairs = jnp.split(sh2_pairs, sh_splits, axis=1)
@@ -63,12 +67,17 @@ def compute_wk_nu1_iijj(vectors1, vectors2, equal_element_pair_labels, l_max, C_
         wk_nu1_iijj[l] = (((-1)**l)/(2*l+1))*(prefactors*sbessi[l])[:, None, None] * sh1_pairs[l][:, :, None] * sh2_pairs[l][:, None, :]
         # wk_nu1_iijj[l] = (prefactors*sbessi_l)[:, None, None] * sh1_pairs_l[:, :, None] * sh2_pairs_l[:, None, :]
         # wk_nu1_iijj[l] = ((prefactors/(2*l+1))*sbessi_l)[:, None, None] * sh1_pairs_l[:, :, None] * sh2_pairs_l[:, None, :]
+        # print(l)
+        # print((A*r1_pairs*r2_pairs)[:2])
+        # print(sbessi[l][:2])
+        # print(wk_nu1_iijj[l][:3])
+    # exit()
 
     return wk_nu1_iijj
 
 
 @partial(jax.jit, static_argnames=["all_species", "l_max"])
-def compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all_species, l_max, r_cut, C_s, lambda_s):
+def compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all_species, l_max, C_s, lambda_s):
 
     vectors1 = get_cartesian_vectors(positions1, jax_structures1)
     vectors2 = get_cartesian_vectors(positions2, jax_structures2)
@@ -156,5 +165,11 @@ def compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all
         # Generate metadata for the nu=1 atom-wise kernels
         s1[a_i] = s1_ai
         s2[a_i] = s2_ai
+
+    """for a_i in all_species:
+        for l in range(l_max+1):
+            print(a_i, l)
+            print(wk_nu1_ii[a_i][(l, 1)][0, 0])
+        exit()"""
 
     return wk_nu1_ii, s1, s2
