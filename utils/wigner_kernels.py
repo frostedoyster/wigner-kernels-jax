@@ -202,10 +202,10 @@ def compute_wks_symm_single_batch_jac(positions, jax_structures, n, all_species,
                 wks_single_batch = compute_wks_single_batch_symm(positions, jax_batch, n_structures)
                 wks = wks.at[idx1:idx1+n_structures, idx2:idx2+n_structures, :].set(wks_single_batch)
                 wks_single_batch_jac = compute_wks_single_batch_symm_jac(positions, jax_batch, n_structures)
-                """wks = wks.at[idx1:idx1+n_structures, idx2:idx2_der+3*n_atoms, :].set(wks_single_batch_jac.reshape(nu_max+1, 3*n_atoms).T)
-                wks = wks.at[idx1:idx1+n_structures, idx2:idx2_der+3*n_atoms, :].set(wks_single_batch_jac.reshape(nu_max+1, 3*n_atoms).T)
-                wks_single_batch_hess = compute_wks_single_batch_symm_hess(positions, jax_batch, n_structures)
-                wks = wks.at[idx1:idx1+n_structures, idx2:idx2+n_structures, :].set(wks_single_batch)"""
+                #wks = wks.at[idx1:idx1+n_structures, idx2:idx2_der+3*n_atoms, :].set(wks_single_batch_jac.reshape(nu_max+1, 3*n_atoms).T)
+                #wks = wks.at[idx1:idx1+n_structures, idx2:idx2_der+3*n_atoms, :].set(wks_single_batch_jac.reshape(nu_max+1, 3*n_atoms).T)
+                #wks_single_batch_hess = compute_wks_single_batch_symm_hess(positions, jax_batch, n_structures)
+                #wks = wks.at[idx1:idx1+n_structures, idx2:idx2+n_structures, :].set(wks_single_batch)
 
             else:
                 jax_batch_1 = jax_batches[idx_batch_1]
