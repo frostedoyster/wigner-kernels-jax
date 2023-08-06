@@ -17,7 +17,7 @@ def split_list(lst, n):
     return list_of_chunks
 
 
-@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s", "lambda_s"])
+@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s"])
 def compute_wks_single_batch(positions_1, positions_2, jax_structures_1, jax_structures_2, n1, n2, all_species, l_max, nu_max, cgs, C_s, lambda_s):
 
     wks_nu0, s1_0, s2_0 = compute_wk_nu0(jax_structures_1, jax_structures_2, all_species)
@@ -40,27 +40,27 @@ def compute_wks_single_batch(positions_1, positions_2, jax_structures_1, jax_str
     return invariant_wks_per_structure
 
 
-@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s", "lambda_s"])
+@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s"])
 def compute_wks_single_batch_sum_1(positions_1, positions_2, jax_structures_1, jax_structures_2, n1, n2, all_species, l_max, nu_max, cgs, C_s, lambda_s):
     wks_single_batch = compute_wks_single_batch(positions_1, positions_2, jax_structures_1, jax_structures_2, n1, n2, all_species, l_max, nu_max, cgs, C_s, lambda_s)
     return jnp.sum(wks_single_batch, axis=0)
 
 compute_wks_single_batch_jac_1 = jax.jit(
     jax.jacrev(compute_wks_single_batch_sum_1, argnums=0),
-    static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s", "lambda_s"]
+    static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s"]
 )
 
-@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s", "lambda_s"])
+@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s"])
 def compute_wks_single_batch_sum_2(positions_1, positions_2, jax_structures_1, jax_structures_2, n1, n2, all_species, l_max, nu_max, cgs, C_s, lambda_s):
     wks_single_batch = compute_wks_single_batch(positions_1, positions_2, jax_structures_1, jax_structures_2, n1, n2, all_species, l_max, nu_max, cgs, C_s, lambda_s)
     return jnp.sum(wks_single_batch, axis=1)
 
 compute_wks_single_batch_jac_2 = jax.jit(
     jax.jacrev(compute_wks_single_batch_sum_2, argnums=1),
-    static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s", "lambda_s"]
+    static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s"]
 )
 
-@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s", "lambda_s"])
+@partial(jax.jit, static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s"])
 def compute_wks_single_batch_sum_1_2(positions_1, positions_2, jax_structures_1, jax_structures_2, n1, n2, all_species, l_max, nu_max, cgs, C_s, lambda_s):
     wks_single_batch = compute_wks_single_batch(positions_1, positions_2, jax_structures_1, jax_structures_2, n1, n2, all_species, l_max, nu_max, cgs, C_s, lambda_s)
     return jnp.sum(wks_single_batch, axis=(0, 1))
@@ -73,7 +73,7 @@ compute_wks_single_batch_hess = jax.jit(
         ),
         argnums=1
     ),
-    static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s", "lambda_s"]
+    static_argnames=["n1", "n2", "all_species", "l_max", "nu_max", "C_s"]
 )
 
 
@@ -202,10 +202,10 @@ def compute_wks_symm_single_batch_jac(positions, jax_structures, n, all_species,
                 wks_single_batch = compute_wks_single_batch_symm(positions, jax_batch, n_structures)
                 wks = wks.at[idx1:idx1+n_structures, idx2:idx2+n_structures, :].set(wks_single_batch)
                 wks_single_batch_jac = compute_wks_single_batch_symm_jac(positions, jax_batch, n_structures)
-                """wks = wks.at[idx1:idx1+n_structures, idx2:idx2_der+3*n_atoms, :].set(wks_single_batch_jac.reshape(nu_max+1, 3*n_atoms).T)
-                wks = wks.at[idx1:idx1+n_structures, idx2:idx2_der+3*n_atoms, :].set(wks_single_batch_jac.reshape(nu_max+1, 3*n_atoms).T)
-                wks_single_batch_hess = compute_wks_single_batch_symm_hess(positions, jax_batch, n_structures)
-                wks = wks.at[idx1:idx1+n_structures, idx2:idx2+n_structures, :].set(wks_single_batch)"""
+                # wks = wks.at[idx1:idx1+n_structures, idx2:idx2_der+3*n_atoms, :].set(wks_single_batch_jac.reshape(nu_max+1, 3*n_atoms).T)
+                #wks = wks.at[idx1:idx1+n_structures, idx2:idx2_der+3*n_atoms, :].set(wks_single_batch_jac.reshape(nu_max+1, 3*n_atoms).T)
+                #wks_single_batch_hess = compute_wks_single_batch_symm_hess(positions, jax_batch, n_structures)
+                #wks = wks.at[idx1:idx1+n_structures, idx2:idx2+n_structures, :].set(wks_single_batch)
 
             else:
                 jax_batch_1 = jax_batches[idx_batch_1]

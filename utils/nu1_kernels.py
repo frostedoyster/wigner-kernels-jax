@@ -8,13 +8,13 @@ from .special_functions import spherical_harmonics, scaled_spherical_bessel_i
 from .dataset_processing import get_cartesian_vectors
 
 
-@jax.jit
-@partial(jax.vmap, in_axes=(0, None, None))
-def sigma(r, C_s, lambda_s):
-    return C_s*jnp.exp(r/lambda_s)
+# @jax.jit
+@partial(jax.vmap, in_axes=(0, None, None, 0))
+def sigma(r, C_s, lambda_s, species):
+    return C_s*jnp.exp(r/(lambda_s[species[0]]+lambda_s[species[1]]))
 
 
-@partial(jax.jit, static_argnames="all_species")
+# @partial(jax.jit, static_argnames="all_species")
 def get_equal_element_pair_labels(aiaj1, aiaj2, all_species):
     # gets all pairs of indices for which ai1=ai2 and aj1=aj2
     # slightly involved approach, but it should scale linearly and not quadratically
@@ -33,8 +33,8 @@ def get_equal_element_pair_labels(aiaj1, aiaj2, all_species):
     return same_aiaj_pairs
 
 
-@partial(jax.jit, static_argnames="l_max")
-def compute_wk_nu1_iijj(vectors1, vectors2, equal_element_pair_labels, l_max, C_s, lambda_s):
+# @partial(jax.jit, static_argnames="l_max")
+def compute_wk_nu1_iijj(vectors1, vectors2, equal_element_pair_labels, l_max, C_s, lambda_s, species1, species2):
 
     sh1 = spherical_harmonics(vectors1, l_max)
     r1 = jnp.sqrt(jnp.sum(vectors1**2, axis=1))
@@ -46,8 +46,10 @@ def compute_wk_nu1_iijj(vectors1, vectors2, equal_element_pair_labels, l_max, C_
     sh2_pairs = sh2[equal_element_pair_labels[:, 1]]
     r1_pairs = r1[equal_element_pair_labels[:, 0]]
     r2_pairs = r2[equal_element_pair_labels[:, 1]]
+    species1_pairs = species1[equal_element_pair_labels[:, 0]]
+    species2_pairs = species2[equal_element_pair_labels[:, 0]]
 
-    A = 1.0/(sigma(r1_pairs, C_s, lambda_s)**2+sigma(r2_pairs, C_s, lambda_s)**2)
+    A = 1.0/(sigma(r1_pairs, C_s, lambda_s, species1_pairs)**2+sigma(r2_pairs, C_s, lambda_s, species2_pairs)**2)
 
     # Gaussians L1:
     prefactors = 32.0*(jnp.pi)**3*(A/(2.0*jnp.pi))**(3/2)*jnp.exp(-A*(r2_pairs-r1_pairs)**2/2.0) #* jnp.exp(-r1_pairs/lambda_s)*jnp.exp(-r2_pairs/lambda_s)
@@ -76,7 +78,7 @@ def compute_wk_nu1_iijj(vectors1, vectors2, equal_element_pair_labels, l_max, C_
     return wk_nu1_iijj
 
 
-@partial(jax.jit, static_argnames=["all_species", "l_max"])
+# @partial(jax.jit, static_argnames=["all_species", "l_max"])
 def compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all_species, l_max, C_s, lambda_s):
 
     vectors1 = get_cartesian_vectors(positions1, jax_structures1)
@@ -97,7 +99,7 @@ def compute_wk_nu1(positions1, positions2, jax_structures1, jax_structures2, all
     # Get all pairs for which the center and neighbor elements are the same:
     equal_element_pair_labels = get_equal_element_pair_labels(nl_indices_per_element_pair_1, nl_indices_per_element_pair_2, all_species)
     ai_splits = np.cumsum([np.sum([nl_indices_per_element_pair_1[(ai, aj)].shape[0]*nl_indices_per_element_pair_2[(ai, aj)].shape[0] for aj in all_species]) for ai in all_species])[:-1]
-    wk_iijj = compute_wk_nu1_iijj(vectors1, vectors2, equal_element_pair_labels, l_max, C_s, lambda_s)
+    wk_iijj = compute_wk_nu1_iijj(vectors1, vectors2, equal_element_pair_labels, l_max, C_s, lambda_s, labels1[:, [3, 4]], labels2[:, [3, 4]])
 
     wk_nu1_ii = {}
     s1 = {}

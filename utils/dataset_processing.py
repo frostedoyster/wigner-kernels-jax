@@ -78,7 +78,7 @@ def create_jax_structures(ase_atoms_structures, all_species, cutoff_radius):
     return jax_structures
 
 
-@jax.jit
+# @jax.jit
 def get_cartesian_vectors(positions, jax_structures):
 
     neighbor_list = jax_structures["neighbor_list"]

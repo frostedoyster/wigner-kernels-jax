@@ -62,7 +62,7 @@ l_max = 3
 cgs = get_cg_coefficients(l_max)
 r_cut = 10.0
 C_s = 0.1
-lambda_s = 1.0
+lambda_s = jnp.array([0.0, 0.31, 0.0, 0.0, 0.0, 0.0, 0.75, 0.0, 0.66])
 
 train_train_kernels = compute_wks_with_derivatives(train_structures, train_structures, all_species, r_cut, l_max, nu_max, cgs, batch_size, C_s, lambda_s)
 for nu in range(nu_max+1):

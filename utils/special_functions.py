@@ -3,8 +3,8 @@ import jax.numpy as jnp
 from functools import partial
 
 
+# @partial(jax.jit, static_argnames="l_max")
 @partial(jax.vmap, in_axes=(0, None))
-@partial(jax.jit, static_argnums=(1,))
 def spherical_harmonics(xyz, l_max):
     # Spherical harmonics
 
@@ -39,7 +39,7 @@ def spherical_harmonics(xyz, l_max):
     return prefactors*ylm
 
 
-@partial(jax.jit, static_argnums=1)
+# @partial(jax.jit, static_argnums=1)
 @partial(jax.vmap, in_axes=(0, None))
 def scaled_spherical_bessel_i(x, l_max):
     # Scaled Modified Spherical Bessel function s = exp(-x)*i_l(x)

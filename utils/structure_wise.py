@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from functools import partial
 
 
-@partial(jax.jit, static_argnames=["n1", "n2"])
+# @partial(jax.jit, static_argnames=["n1", "n2"])
 def compute_stucture_wise_kernels(atom_wise_kernels, s1, s2, n1, n2):
 
     # Get the number of structures in both kernel dimensions:

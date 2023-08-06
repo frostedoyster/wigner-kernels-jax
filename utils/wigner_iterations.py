@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from functools import partial
 
 
-@partial(jax.jit, static_argnames=("l1", "l2", "L"))
+# @partial(jax.jit, static_argnames=("l1", "l2", "L"))
 def perform_wigner_operation(wk1, wk2, cg_tensor, l1, l2, L):
 
     dense_transformation_matrix = cg_tensor.reshape((2*l1+1)*(2*l2+1), 2*L+1)
@@ -19,7 +19,7 @@ def perform_wigner_operation(wk1, wk2, cg_tensor, l1, l2, L):
     return result
 
 
-@partial(jax.jit, static_argnames=("l_max", "full"))
+# @partial(jax.jit, static_argnames=("l_max", "full"))
 def iterate_wigner_kernels(wks1, wks2, cgs, l_max, full=True):
 
     # We assume that wks1 and wks2 have the same a_i keys: there should be no exceptions
@@ -44,7 +44,7 @@ def iterate_wigner_kernels(wks1, wks2, cgs, l_max, full=True):
     return wks_out
 
 
-@partial(jax.jit, static_argnames=("all_species", "nu_max", "l_max"))
+# @partial(jax.jit, static_argnames=("all_species", "nu_max", "l_max"))
 def compute_wks_high_order(wks_nu1, all_species, nu_max, l_max, cgs):
 
     invariant_wks_nu1 = {}
