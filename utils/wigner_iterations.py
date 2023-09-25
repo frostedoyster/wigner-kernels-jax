@@ -7,17 +7,7 @@ from functools import partial
 
 # @partial(jax.jit, static_argnames=("l1", "l2", "L"))
 def perform_wigner_operation(wk1, wk2, cg_tensor, l1, l2, L):
-
-    dense_transformation_matrix = cg_tensor.reshape((2*l1+1)*(2*l2+1), 2*L+1)
-    product = jnp.einsum("ijab, ijcd -> ijacbd", wk1, wk2)  # to be benchmarked against e.g. wk1[:, :, :, :, jnp.newax.WRONG.is, jnp.newaxis] * wk2[...]
-    result = product.reshape((product.shape[0], product.shape[1], (2*l1+1)*(2*l2+1), (2*l1+1)*(2*l2+1)))
-    result = result @ dense_transformation_matrix
-    result = result.swapaxes(2, 3)
-    result = result @ dense_transformation_matrix
-    result = result.swapaxes(2, 3)
-
-    return result
-
+    return jnp.einsum("ijab, ijcd, acx, bdy -> ijxy", wk1, wk2, cg_tensor, cg_tensor)
 
 # @partial(jax.jit, static_argnames=("l_max", "full"))
 def iterate_wigner_kernels(wks1, wks2, cgs, l_max, full=True):
@@ -38,7 +28,7 @@ def iterate_wigner_kernels(wks1, wks2, cgs, l_max, full=True):
                     if (L, S) not in wks_out_ai:
                         wks_out_ai[(L, S)] = wigner_chunk
                     else:
-                        wks_out_ai[(L, S)] = jnp.add(wks_out_ai[(L, S)], wigner_chunk)
+                        wks_out_ai[(L, S)] = wks_out_ai[(L, S)].at[:, :, :, :].add(wigner_chunk)
         wks_out[a_i] = wks_out_ai
     
     return wks_out

@@ -1,12 +1,13 @@
 import jax
 import jax.numpy as jnp
 from functools import partial
-import tqdm
 from .dataset_processing import create_jax_structures
 from .nu0_kernels import compute_wk_nu0
 from .nu1_kernels import compute_wk_nu1
 from .wigner_iterations import compute_wks_high_order
 from .structure_wise import compute_stucture_wise_kernels
+
+import tqdm
 
 
 def split_list(lst, n):
@@ -88,7 +89,7 @@ def compute_wks(structures1, structures2, all_species, r_cut, l_max, nu_max, cgs
 
     wks = jnp.empty((ntot1, ntot2, nu_max+1))
     idx1 = 0
-    for jax_batch_1 in tqdm.tqdm(jax_batches_1):
+    for jax_batch_1 in jax_batches_1:
         idx2 = 0
         for jax_batch_2 in jax_batches_2:
 
@@ -115,7 +116,8 @@ def compute_wks_with_derivatives(structures1, structures2, all_species, r_cut, l
     wks = jnp.empty((ntot1+ntot1_der, ntot2+ntot2_der, nu_max+1))
     idx1 = 0
     idx1_der = ntot1
-    for jax_batch_1 in tqdm.tqdm(jax_batches_1):
+    for i, jax_batch_1 in enumerate(jax_batches_1):
+        print(i)
         positions_1 = jax_batch_1["positions"]
         n_structures_1 = jax_batch_1["n_structures"]
         n_atoms_1 = positions_1.shape[0]

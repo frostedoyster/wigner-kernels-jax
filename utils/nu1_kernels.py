@@ -47,15 +47,15 @@ def compute_wk_nu1_iijj(vectors1, vectors2, equal_element_pair_labels, l_max, C_
     r1_pairs = r1[equal_element_pair_labels[:, 0]]
     r2_pairs = r2[equal_element_pair_labels[:, 1]]
     species1_pairs = species1[equal_element_pair_labels[:, 0]]
-    species2_pairs = species2[equal_element_pair_labels[:, 0]]
+    species2_pairs = species2[equal_element_pair_labels[:, 1]]
 
     A = 1.0/(sigma(r1_pairs, C_s, lambda_s, species1_pairs)**2+sigma(r2_pairs, C_s, lambda_s, species2_pairs)**2)
 
     # Gaussians L1:
-    prefactors = 32.0*(jnp.pi)**3*(A/(2.0*jnp.pi))**(3/2)*jnp.exp(-A*(r2_pairs-r1_pairs)**2/2.0) #* jnp.exp(-r1_pairs/lambda_s)*jnp.exp(-r2_pairs/lambda_s)
+    prefactors = 32.0*(jnp.pi)**3*(A/(2.0*jnp.pi))**(3/2)*jnp.exp(-A*(r2_pairs-r1_pairs)**2/2.0) * jnp.exp(-r1_pairs/(lambda_s[species1_pairs[:, 0]]+lambda_s[species1_pairs[:, 1]]))*jnp.exp(-r2_pairs/(lambda_s[species2_pairs[:, 0]]+lambda_s[species2_pairs[:, 1]]))
     
     # Gaussians L2:
-    # ?????? prefactors = 32.0*(jnp.pi)**3*(A/(2.0*jnp.pi))**(3/2)*jnp.exp(-A*(r2_pairs-r1_pairs)**2/2.0) #*jnp.exp(-r1_pairs/lambda_s)*jnp.exp(-r2_pairs/lambda_s)
+    # prefactors = 8.0*32.0*(jnp.pi)**(3/2)*sigma(r1_pairs, C_s, lambda_s, species1_pairs)**(3/2)*sigma(r2_pairs, C_s, lambda_s, species2_pairs)**(3/2)*(A/(2.0*jnp.pi))**(3/2)*jnp.exp(-A*(r2_pairs-r1_pairs)**2/2.0) #*jnp.exp(-r1_pairs/lambda_s)*jnp.exp(-r2_pairs/lambda_s)
 
     sbessi = scaled_spherical_bessel_i(A*r1_pairs*r2_pairs, l_max)
     sh_splits = [l**2 for l in range(1, l_max+1)]
@@ -66,7 +66,8 @@ def compute_wk_nu1_iijj(vectors1, vectors2, equal_element_pair_labels, l_max, C_
 
     wk_nu1_iijj = {}
     for l in range(l_max+1):
-        wk_nu1_iijj[l] = (((-1)**l)/(2*l+1))*(prefactors*sbessi[l])[:, None, None] * sh1_pairs[l][:, :, None] * sh2_pairs[l][:, None, :]
+        # wk_nu1_iijj[l] = (((-1)**l)/(2*l+1))*(prefactors*sbessi[l])[:, None, None] * sh1_pairs[l][:, :, None] * sh2_pairs[l][:, None, :]
+        wk_nu1_iijj[l] = (((-1)**l))*(prefactors*sbessi[l])[:, None, None] * sh1_pairs[l][:, :, None] * sh2_pairs[l][:, None, :]
         # wk_nu1_iijj[l] = (prefactors*sbessi_l)[:, None, None] * sh1_pairs_l[:, :, None] * sh2_pairs_l[:, None, :]
         # wk_nu1_iijj[l] = ((prefactors/(2*l+1))*sbessi_l)[:, None, None] * sh1_pairs_l[:, :, None] * sh2_pairs_l[:, None, :]
         # print(l)
