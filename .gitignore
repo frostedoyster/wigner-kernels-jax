@@ -166,3 +166,4 @@ cython_debug/
 *dummy*
 *.out
 *.sh
+jax_spliner.py

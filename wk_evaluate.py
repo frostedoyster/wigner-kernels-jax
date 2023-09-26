@@ -191,11 +191,15 @@ evaluate_energies_and_forces = jax.jit(
     static_argnames=["n_train", "all_species", "l_max", "nu_max"]
 )
 
-evaluate_energies_and_forces(jax_batch_evaluate["positions"], jax_batch_evaluate, jax_batch_train, n_train, all_species, l_max, nu_max, cgs, C_s, lambda_s, nu_coefficient_vector_best, c_best)
+e, neg_f = evaluate_energies_and_forces(jax_batch_evaluate["positions"], jax_batch_evaluate, jax_batch_train, n_train, all_species, l_max, nu_max, cgs, C_s, lambda_s, nu_coefficient_vector_best, c_best)
+e.block_until_ready()
+neg_f.block_until_ready()
 
 import time
 start = time.time()
 for _ in range(100):
-    evaluate_energies_and_forces(jax_batch_evaluate["positions"], jax_batch_evaluate, jax_batch_train, n_train, all_species, l_max, nu_max, cgs, C_s, lambda_s, nu_coefficient_vector_best, c_best)
+    e, neg_f = evaluate_energies_and_forces(jax_batch_evaluate["positions"], jax_batch_evaluate, jax_batch_train, n_train, all_species, l_max, nu_max, cgs, C_s, lambda_s, nu_coefficient_vector_best, c_best)
+    e.block_until_ready()
+    neg_f.block_until_ready()
 finish = time.time()
 print(f"Took {(finish-start)/100.0}s")
