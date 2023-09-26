@@ -25,7 +25,7 @@ np.random.seed(0)
 n_train = 50
 n_validation = 50
 n_test = 50
-batch_size = 2
+batch_size = 1
 force_weight = 0.03
 
 print(dataset)
