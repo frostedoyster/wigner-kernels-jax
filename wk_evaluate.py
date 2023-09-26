@@ -13,6 +13,7 @@ from functools import partial
 from utils.clebsch_gordan import get_cg_coefficients
 from utils.error_measures import get_mae, get_rmse
 from utils.wigner_kernels import compute_wks_with_derivatives
+from utils.spliner import get_LE_splines
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -21,10 +22,10 @@ args = parser.parse_args()
 dataset = args.dataset
 
 np.random.seed(0)
-n_train = 10
+n_train = 50
 n_validation = 50
 n_test = 50
-batch_size = 1
+batch_size = 2
 force_weight = 0.03
 
 print(dataset)
@@ -66,24 +67,28 @@ all_species = tuple([int(atomic_number) for atomic_number in all_species_jax])
 print("All species:", all_species)
 nu_max = 4
 l_max = 3
+n_max = 35
 cgs = get_cg_coefficients(l_max)
 r_cut = 10.0
+#C_s = jnp.array([0.0, 0.31, 0.0, 0.0, 0.0, 0.0, 0.75, 0.71, 0.66, 0.57]) * 0.03
+#lambda_s = jnp.array([0.0, 0.31, 0.0, 0.0, 0.0, 0.0, 0.75, 0.71, 0.66, 0.57]) * 0.5
+C_s = 0.2
+lambda_s = 3.0
 
-a = 0.2
-b = 3.0
+spline_positions, spline_values, spline_derivatives = get_LE_splines(l_max, n_max, r_cut, C_s, lambda_s, 1e-4)
+radial_splines = {
+    "positions": jnp.array(spline_positions),
+    "values": jnp.array(spline_values),
+    "derivatives": jnp.array(spline_derivatives)
+}
 
-# C_s = jnp.array([0.0, 0.31, 0.0, 0.0, 0.0, 0.0, 0.75, 0.71, 0.66, 0.57]) * a
-# lambda_s = jnp.array([0.0, 0.31, 0.0, 0.0, 0.0, 0.0, 0.75, 0.71, 0.66, 0.57]) * b
-C_s = jnp.array([0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5]) * a
-lambda_s = jnp.array([0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5]) * b
-
-train_train_kernels = compute_wks_with_derivatives(train_structures, train_structures, all_species, r_cut, l_max, nu_max, cgs, batch_size, C_s, lambda_s)
+train_train_kernels = compute_wks_with_derivatives(train_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
 """for nu in range(nu_max+1):
     print(train_train_kernels[:, :, nu])
     print()"""
 
-# validation_train_kernels = compute_wks_with_derivatives(validation_structures, train_structures, all_species, r_cut, l_max, nu_max, cgs, batch_size, C_s, lambda_s)
-test_train_kernels = compute_wks_with_derivatives(test_structures, train_structures, all_species, r_cut, l_max, nu_max, cgs, batch_size, C_s, lambda_s)
+# validation_train_kernels = compute_wks_with_derivatives(validation_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
+test_train_kernels = compute_wks_with_derivatives(test_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
 # !!!!!!!!!!!!!!
 validation_train_kernels = test_train_kernels.copy()
 
@@ -159,28 +164,27 @@ from utils.dataset_processing import create_jax_structures
 jax_batch_evaluate = create_jax_structures([test_structures[0]], all_species, r_cut)  # to be changed to multiple ones?
 jax_batch_train = create_jax_structures(train_structures, all_species, r_cut)
 
-@partial(jax.jit, static_argnames=["n_train", "all_species", "l_max", "nu_max"])
-def compute_wks_single_batch_and_contract_over_nu(positions, train_positions, jax_structure_evaluate, jax_structures_train, n_train, all_species, l_max, nu_max, cgs, C_s, lambda_s, nu_coefficient_vector_best):
+@partial(jax.jit, static_argnames=["n_train", "all_species", "l_max", "n_max", "nu_max"])
+def compute_wks_single_batch_and_contract_over_nu(positions, train_positions, jax_structure_evaluate, jax_structures_train, n_train, all_species, l_max, n_max, nu_max, cgs, radial_splines, nu_coefficient_vector_best):
     wigner_kernels = compute_wks_single_batch(positions, train_positions, jax_structure_evaluate, jax_structures_train,
-        1, n_train, all_species, l_max, nu_max, cgs, C_s, lambda_s)
+        1, n_train, all_species, l_max, n_max, nu_max, cgs, radial_splines)
     return (wigner_kernels @ nu_coefficient_vector_best).squeeze(axis=0)
 
-@partial(jax.jit, static_argnames=["n_train", "all_species", "l_max", "nu_max"])
-def compute_wks_single_batch_and_contract_over_nu_sum(positions, train_positions, jax_structure_evaluate, jax_structures_train, n_train, all_species, l_max, nu_max, cgs, C_s, lambda_s, nu_coefficient_vector_best):
-    contracted_kernels = compute_wks_single_batch_and_contract_over_nu(positions, train_positions, jax_structure_evaluate, jax_structures_train, n_train, all_species, l_max, nu_max, cgs, C_s, lambda_s, nu_coefficient_vector_best)
+def compute_wks_single_batch_and_contract_over_nu_sum(positions, train_positions, jax_structure_evaluate, jax_structures_train, n_train, all_species, l_max, n_max, nu_max, cgs, radial_splines, nu_coefficient_vector_best):
+    contracted_kernels = compute_wks_single_batch_and_contract_over_nu(positions, train_positions, jax_structure_evaluate, jax_structures_train, n_train, all_species, l_max, n_max, nu_max, cgs, radial_splines, nu_coefficient_vector_best)
     return jnp.sum(contracted_kernels, axis=0)
 
 compute_wks_single_batch_and_contract_over_nu_jac = jax.jit(
     jax.grad(compute_wks_single_batch_and_contract_over_nu_sum, argnums=1),
-    static_argnames=["n_train", "all_species", "l_max", "nu_max"]
+    static_argnames=["n_train", "all_species", "l_max", "n_max", "nu_max"]
 )
 
-@partial(jax.jit, static_argnames=["n_train", "all_species", "l_max", "nu_max"])
-def evaluate_energies(positions, jax_structure_evaluate, jax_structures_train, n_train, all_species, l_max, nu_max, cgs, C_s, lambda_s, nu_coefficient_vector_best, c_best):
+@partial(jax.jit, static_argnames=["n_train", "all_species", "l_max", "n_max", "nu_max"])
+def evaluate_energies(positions, jax_structure_evaluate, jax_structures_train, n_train, all_species, l_max, n_max, nu_max, cgs, radial_splines, nu_coefficient_vector_best, c_best):
     support_points = compute_wks_single_batch_and_contract_over_nu(positions, jax_structures_train["positions"], jax_structure_evaluate, jax_structures_train,
-        n_train, all_species, l_max, nu_max, cgs, C_s, lambda_s, nu_coefficient_vector_best)
+        n_train, all_species, l_max, n_max, nu_max, cgs, radial_splines, nu_coefficient_vector_best)
     support_points_derivatives = compute_wks_single_batch_and_contract_over_nu_jac(positions, jax_structures_train["positions"], jax_structure_evaluate, jax_structures_train,
-        n_train, all_species, l_max, nu_max, cgs, C_s, lambda_s, nu_coefficient_vector_best)
+        n_train, all_species, l_max, n_max, nu_max, cgs, radial_splines, nu_coefficient_vector_best)
     support_points_derivatives = support_points_derivatives.flatten()
     total_support_points = jnp.concatenate((support_points, support_points_derivatives))
     energy = total_support_points @ c_best
@@ -188,17 +192,17 @@ def evaluate_energies(positions, jax_structure_evaluate, jax_structures_train, n
 
 evaluate_energies_and_forces = jax.jit(
     jax.value_and_grad(evaluate_energies),
-    static_argnames=["n_train", "all_species", "l_max", "nu_max"]
+    static_argnames=["n_train", "all_species", "l_max", "n_max", "nu_max"]
 )
 
-e, neg_f = evaluate_energies_and_forces(jax_batch_evaluate["positions"], jax_batch_evaluate, jax_batch_train, n_train, all_species, l_max, nu_max, cgs, C_s, lambda_s, nu_coefficient_vector_best, c_best)
+e, neg_f = evaluate_energies_and_forces(jax_batch_evaluate["positions"], jax_batch_evaluate, jax_batch_train, n_train, all_species, l_max, n_max, nu_max, cgs, radial_splines, nu_coefficient_vector_best, c_best)
 e.block_until_ready()
 neg_f.block_until_ready()
 
 import time
 start = time.time()
 for _ in range(100):
-    e, neg_f = evaluate_energies_and_forces(jax_batch_evaluate["positions"], jax_batch_evaluate, jax_batch_train, n_train, all_species, l_max, nu_max, cgs, C_s, lambda_s, nu_coefficient_vector_best, c_best)
+    e, neg_f = evaluate_energies_and_forces(jax_batch_evaluate["positions"], jax_batch_evaluate, jax_batch_train, n_train, all_species, l_max, n_max, nu_max, cgs, radial_splines, nu_coefficient_vector_best, c_best)
     e.block_until_ready()
     neg_f.block_until_ready()
 finish = time.time()

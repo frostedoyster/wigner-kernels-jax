@@ -13,6 +13,7 @@ from functools import partial
 from utils.clebsch_gordan import get_cg_coefficients
 from utils.error_measures import get_mae, get_rmse
 from utils.wigner_kernels import compute_wks_with_derivatives
+from utils.spliner import get_LE_splines
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -24,7 +25,7 @@ np.random.seed(0)
 n_train = 50
 n_validation = 50
 n_test = 50
-batch_size = 1
+batch_size = 2
 force_weight = 0.03
 
 print(dataset)
@@ -68,24 +69,27 @@ nu_max = 4
 l_max = 3
 cgs = get_cg_coefficients(l_max)
 r_cut = 10.0
+n_max = 35
 
 validation_score_best_best = np.inf
-for a in np.geomspace(0.15, 0.45, 10):
-    for b in np.geomspace(2.0, 7.0, 10):
+for a in np.geomspace(0.15, 0.45, 8):
+    for b in np.geomspace(2.0, 7.0, 8):
         print(a, b)
 
-        # C_s = jnp.array([0.0, 0.31, 0.0, 0.0, 0.0, 0.0, 0.75, 0.71, 0.66, 0.57]) * a
-        # lambda_s = jnp.array([0.0, 0.31, 0.0, 0.0, 0.0, 0.0, 0.75, 0.71, 0.66, 0.57]) * b
-        C_s = jnp.array([0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5]) * a
-        lambda_s = jnp.array([0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5]) * b
+        spline_positions, spline_values, spline_derivatives = get_LE_splines(l_max, n_max, r_cut, a, b, 1e-4)
+        radial_splines = {
+            "positions": jnp.array(spline_positions),
+            "values": jnp.array(spline_values),
+            "derivatives": jnp.array(spline_derivatives)
+        }
 
-        train_train_kernels = compute_wks_with_derivatives(train_structures, train_structures, all_species, r_cut, l_max, nu_max, cgs, batch_size, C_s, lambda_s)
+        train_train_kernels = compute_wks_with_derivatives(train_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
         """for nu in range(nu_max+1):
             print(train_train_kernels[:, :, nu])
             print()"""
 
-        # validation_train_kernels = compute_wks_with_derivatives(validation_structures, train_structures, all_species, r_cut, l_max, nu_max, cgs, batch_size, C_s, lambda_s)
-        test_train_kernels = compute_wks_with_derivatives(test_structures, train_structures, all_species, r_cut, l_max, nu_max, cgs, batch_size, C_s, lambda_s)
+        # validation_train_kernels = compute_wks_with_derivatives(validation_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
+        test_train_kernels = compute_wks_with_derivatives(test_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
         # !!!!!!!!!!!!!!
         validation_train_kernels = test_train_kernels.copy()
 

@@ -13,6 +13,7 @@ from functools import partial
 from utils.clebsch_gordan import get_cg_coefficients
 from utils.error_measures import get_mae, get_rmse
 from utils.wigner_kernels import compute_wks
+from utils.spliner import get_LE_splines
 
 import tqdm
 
@@ -40,14 +41,22 @@ all_species = tuple([int(atomic_number) for atomic_number in all_species_jax])
 print("All species:", all_species)
 nu_max = 4
 l_max = 3
+n_max = 35
 cgs = get_cg_coefficients(l_max)
 r_cut = 10.0
 #C_s = jnp.array([0.0, 0.31, 0.0, 0.0, 0.0, 0.0, 0.75, 0.71, 0.66, 0.57]) * 0.03
 #lambda_s = jnp.array([0.0, 0.31, 0.0, 0.0, 0.0, 0.0, 0.75, 0.71, 0.66, 0.57]) * 0.5
-C_s = jnp.array([0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5]) * 0.2
-lambda_s = jnp.array([0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5]) * 3.0
+C_s = 0.2
+lambda_s = 3.0
 
-train_train_kernels = compute_wks(train_structures, train_structures, all_species, r_cut, l_max, nu_max, cgs, batch_size, C_s, lambda_s)
+spline_positions, spline_values, spline_derivatives = get_LE_splines(l_max, n_max, r_cut, C_s, lambda_s, 1e-4)
+radial_splines = {
+    "positions": jnp.array(spline_positions),
+    "values": jnp.array(spline_values),
+    "derivatives": jnp.array(spline_derivatives)
+}
+
+train_train_kernels = compute_wks(train_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
 
 print()
 print("Printing a few representative kernels:")
@@ -58,8 +67,8 @@ for nu in range(nu_max+1):
     print(train_train_kernels[:6, :6, nu])
     print()
 
-validation_train_kernels = compute_wks(validation_structures, train_structures, all_species, r_cut, l_max, nu_max, cgs, batch_size, C_s, lambda_s)
-test_train_kernels = compute_wks(test_structures, train_structures, all_species, r_cut, l_max, nu_max, cgs, batch_size, C_s, lambda_s)
+validation_train_kernels = compute_wks(validation_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
+test_train_kernels = compute_wks(test_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
 
 # 3D grid search
 optimization_target = "MAE"
