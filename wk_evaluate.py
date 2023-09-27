@@ -75,15 +75,14 @@ r_cut = 10.0
 C_s = 0.2
 lambda_s = 3.0
 
-print("Hey1")
-
+print("Finsihed CG coefficients")
 spline_positions, spline_values, spline_derivatives = get_LE_splines(l_max, n_max, r_cut, C_s, lambda_s, 1e-4)
 radial_splines = {
     "positions": jnp.array(spline_positions),
     "values": jnp.array(spline_values),
     "derivatives": jnp.array(spline_derivatives)
 }
-print("Hey2")
+print("Finished splines")
 
 """
 train_train_kernels = compute_wks_with_derivatives(train_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
@@ -154,12 +153,11 @@ print(f"Best validation error: {validation_best_energies} {validation_best_force
 print(f"Test error ({optimization_target}):")
 print(test_best_energies, test_best_forces)
 print()"""
-print("Hey3")
 
 log_C0_best = 1
 log_C_best = 1
 alpha_best = 1
-c_best = jnp.zeros((50*(1+9*3),))
+c_best = jnp.zeros((50*(1+train_structures[0].positions.shape[0]*3),))
 
 C0_best = 10**log_C0_best
 C_best = 10**log_C_best
@@ -173,7 +171,7 @@ from utils.dataset_processing import create_jax_structures
 jax_batch_evaluate = create_jax_structures([test_structures[0]], all_species, r_cut)  # to be changed to multiple ones?
 jax_batch_train = create_jax_structures(train_structures, all_species, r_cut)
 
-print("Hey4")
+print("Finished pre-processing")
 
 @partial(jax.jit, static_argnames=["n_train", "all_species", "l_max", "n_max", "nu_max"])
 def compute_wks_single_batch_and_contract_over_nu(positions, train_positions, jax_structure_evaluate, jax_structures_train, n_train, all_species, l_max, n_max, nu_max, cgs, radial_splines, nu_coefficient_vector_best):
