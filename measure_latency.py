@@ -205,14 +205,12 @@ evaluate_energies_and_forces = jax.jit(
 )
 
 e, neg_f = evaluate_energies_and_forces(jax_batch_evaluate["positions"], jax_batch_evaluate, jax_batch_train, n_train, all_species, l_max, n_max, nu_max, cgs, radial_splines, nu_coefficient_vector_best, c_best)
-e.block_until_ready()
 neg_f.block_until_ready()
 
 import time
 start = time.time()
-for _ in range(100):
+for _ in range(1000):
     e, neg_f = evaluate_energies_and_forces(jax_batch_evaluate["positions"], jax_batch_evaluate, jax_batch_train, n_train, all_species, l_max, n_max, nu_max, cgs, radial_splines, nu_coefficient_vector_best, c_best)
-    e.block_until_ready()
     neg_f.block_until_ready()
 finish = time.time()
-print(f"Took {(finish-start)/100.0}s")
+print(f"Took {(finish-start)/1000}s")

@@ -89,8 +89,7 @@ def compute_wks(structures1, structures2, all_species, r_cut, l_max, n_max, nu_m
 
     wks = jnp.empty((ntot1, ntot2, nu_max+1))
     idx1 = 0
-    for i, jax_batch_1 in enumerate(jax_batches_1):
-        print(i)
+    for jax_batch_1 in tqdm.tqdm(jax_batches_1):
         idx2 = 0
         for jax_batch_2 in jax_batches_2:
 
@@ -117,8 +116,7 @@ def compute_wks_with_derivatives(structures1, structures2, all_species, r_cut, l
     wks = jnp.empty((ntot1+ntot1_der, ntot2+ntot2_der, nu_max+1))
     idx1 = 0
     idx1_der = ntot1
-    for i, jax_batch_1 in enumerate(jax_batches_1):
-        # print(i)
+    for jax_batch_1 in tqdm.tqdm(jax_batches_1):
         positions_1 = jax_batch_1["positions"]
         n_structures_1 = jax_batch_1["n_structures"]
         n_atoms_1 = positions_1.shape[0]

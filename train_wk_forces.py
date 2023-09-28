@@ -23,8 +23,8 @@ dataset = args.dataset
 
 np.random.seed(0)
 n_train = 50
-n_validation = 50
-n_test = 50
+n_validation = 1000
+n_test = 1000
 batch_size = 1
 force_weight = 0.03
 
@@ -71,97 +71,84 @@ cgs = get_cg_coefficients(l_max)
 r_cut = 10.0
 n_max = 35
 
-validation_score_best_best = np.inf
-for a in np.geomspace(0.15, 0.45, 8):
-    for b in np.geomspace(2.0, 7.0, 8):
-        print(a, b)
+a = 0.2
+b = 3.0
 
-        spline_positions, spline_values, spline_derivatives = get_LE_splines(l_max, n_max, r_cut, a, b, 1e-4)
-        radial_splines = {
-            "positions": jnp.array(spline_positions),
-            "values": jnp.array(spline_values),
-            "derivatives": jnp.array(spline_derivatives)
-        }
+spline_positions, spline_values, spline_derivatives = get_LE_splines(l_max, n_max, r_cut, a, b, 1e-4)
+radial_splines = {
+    "positions": jnp.array(spline_positions),
+    "values": jnp.array(spline_values),
+    "derivatives": jnp.array(spline_derivatives)
+}
 
-        train_train_kernels = compute_wks_with_derivatives(train_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
-        """for nu in range(nu_max+1):
-            print(train_train_kernels[:, :, nu])
-            print()"""
+train_train_kernels = compute_wks_with_derivatives(train_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
+"""for nu in range(nu_max+1):
+    print(train_train_kernels[:, :, nu])
+    print()"""
 
-        # validation_train_kernels = compute_wks_with_derivatives(validation_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
-        test_train_kernels = compute_wks_with_derivatives(test_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
-        # !!!!!!!!!!!!!!
-        validation_train_kernels = test_train_kernels.copy()
+# validation_train_kernels = compute_wks_with_derivatives(validation_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
+test_train_kernels = compute_wks_with_derivatives(test_structures, train_structures, all_species, r_cut, l_max, n_max, nu_max, cgs, batch_size, radial_splines)
+# !!!!!!!!!!!!!!
+validation_train_kernels = test_train_kernels.copy()
 
-        train_train_kernels = train_train_kernels.at[n_train:].set(force_weight*train_train_kernels[n_train:])
-        train_train_kernels = train_train_kernels.at[:, n_train:].set(force_weight*train_train_kernels[:, n_train:])
-        validation_train_kernels = validation_train_kernels.at[n_validation:].set(force_weight*validation_train_kernels[n_validation:])
-        validation_train_kernels = validation_train_kernels.at[:, n_train:].set(force_weight*validation_train_kernels[:, n_train:])
-        test_train_kernels = test_train_kernels.at[n_test:].set(force_weight*test_train_kernels[n_test:])
-        test_train_kernels = test_train_kernels.at[:, n_train:].set(force_weight*test_train_kernels[:, n_train:])
+@partial(jax.jit, static_argnames=["idx_start_dim_1", "idx_start_dim_2"])
+def apply_force_weight(kernels, idx_start_dim_1, idx_start_dim_2, force_weight):
+    kernels = kernels.at[idx_start_dim_1:].multiply(force_weight)
+    kernels = kernels.at[:, idx_start_dim_2:].multiply(force_weight)
+    return kernels
 
-        # 3D grid search
-        optimization_target = "MAE"
-        validation_score_best = 1e90
-        print((f"The optimization target is {optimization_target}"))
-        for log_C0 in range(6, 19):
-            for log_C in range(-5, 8):
-                for alpha in np.geomspace(0.001, 1.0, 101):
-                    C0 = 10**log_C0
-                    C = 10**log_C
-                    nu_coefficient_vector = jnp.array([C0] + [C*(alpha**nu)/factorial(nu) for nu in range(1, nu_max+1)])
-                    train_train_kernel = train_train_kernels @ nu_coefficient_vector
-                    validation_train_kernel = validation_train_kernels @ nu_coefficient_vector
-                    test_train_kernel = test_train_kernels @ nu_coefficient_vector
-                    c = jnp.linalg.solve(train_train_kernel+jnp.eye(train_train_kernel.shape[0]), train_targets)
-                    if optimization_target == "RMSE":
-                        train_error_forces = get_rmse(train_targets[n_train:], (train_train_kernel @ c)[n_train:]) / force_weight
-                        validation_error_forces = get_rmse(validation_targets[n_validation:], (validation_train_kernel @ c)[n_validation:]) / force_weight
-                        test_error_forces = get_rmse(test_targets[n_test:], (test_train_kernel @ c)[n_test:]) / force_weight
-                        train_error_energies = get_rmse(train_targets[:n_train], (train_train_kernel @ c)[:n_train])
-                        validation_error_energies = get_rmse(validation_targets[:n_validation], (validation_train_kernel @ c)[:n_validation])
-                        test_error_energies = get_rmse(test_targets[:n_test], (test_train_kernel @ c)[:n_test])
-                    elif optimization_target == "MAE":
-                        train_error_forces = get_mae(train_targets[n_train:], (train_train_kernel @ c)[n_train:]) / force_weight
-                        validation_error_forces = get_mae(validation_targets[n_validation:], (validation_train_kernel @ c)[n_validation:]) / force_weight
-                        test_error_forces = get_mae(test_targets[n_test:], (test_train_kernel @ c)[n_test:]) / force_weight
-                        train_error_energies = get_mae(train_targets[:n_train], (train_train_kernel @ c)[:n_train])
-                        validation_error_energies = get_mae(validation_targets[:n_validation], (validation_train_kernel @ c)[:n_validation])
-                        test_error_energies = get_mae(test_targets[:n_test], (test_train_kernel @ c)[:n_test])
-                    else:
-                        raise ValueError("The optimization target must be rmse or mae")
-                    #print()
-                    #print(log_C0, log_C, alpha)
-                    #print(train_error_energies, validation_error_energies, test_error_energies, train_error_forces, validation_error_forces, test_error_forces)
-                    validation_score = validation_error_energies+validation_error_forces
-                    if validation_score < validation_score_best:
-                        validation_score_best = validation_score
-                        validation_best_forces = validation_error_forces
-                        validation_best_energies = validation_error_energies
-                        test_best_forces = test_error_forces
-                        test_best_energies = test_error_energies
-                        log_C0_best = log_C0
-                        log_C_best = log_C
-                        alpha_best = alpha
+train_train_kernel = apply_force_weight(train_train_kernels, n_train, n_train, force_weight)
+validation_train_kernel = apply_force_weight(validation_train_kernels, n_validation, n_train, force_weight)
+test_train_kernel = apply_force_weight(test_train_kernels, n_test, n_train, force_weight)
 
-        print(f"Best optimization parameters: log_C0={log_C0_best}, log_C={log_C_best}, alpha={alpha_best}")
-        print(f"Best validation error: {validation_best_energies} {validation_best_forces}")
+# 3D grid search
+optimization_target = "MAE"
+validation_score_best = 1e90
+print((f"The optimization target is {optimization_target}"))
+for log_C0 in range(6, 19):
+    for log_C in range(-5, 8):
+        for alpha in np.geomspace(0.001, 1.0, 101):
+            C0 = 10**log_C0
+            C = 10**log_C
+            nu_coefficient_vector = jnp.array([C0] + [C*(alpha**nu)/factorial(nu) for nu in range(1, nu_max+1)])
+            train_train_kernel = train_train_kernels @ nu_coefficient_vector
+            validation_train_kernel = validation_train_kernels @ nu_coefficient_vector
+            test_train_kernel = test_train_kernels @ nu_coefficient_vector
+            c = jnp.linalg.solve(train_train_kernel+jnp.eye(train_train_kernel.shape[0]), train_targets)
+            if optimization_target == "RMSE":
+                train_error_forces = get_rmse(train_targets[n_train:], (train_train_kernel @ c)[n_train:]) / force_weight
+                validation_error_forces = get_rmse(validation_targets[n_validation:], (validation_train_kernel @ c)[n_validation:]) / force_weight
+                test_error_forces = get_rmse(test_targets[n_test:], (test_train_kernel @ c)[n_test:]) / force_weight
+                train_error_energies = get_rmse(train_targets[:n_train], (train_train_kernel @ c)[:n_train])
+                validation_error_energies = get_rmse(validation_targets[:n_validation], (validation_train_kernel @ c)[:n_validation])
+                test_error_energies = get_rmse(test_targets[:n_test], (test_train_kernel @ c)[:n_test])
+            elif optimization_target == "MAE":
+                train_error_forces = get_mae(train_targets[n_train:], (train_train_kernel @ c)[n_train:]) / force_weight
+                validation_error_forces = get_mae(validation_targets[n_validation:], (validation_train_kernel @ c)[n_validation:]) / force_weight
+                test_error_forces = get_mae(test_targets[n_test:], (test_train_kernel @ c)[n_test:]) / force_weight
+                train_error_energies = get_mae(train_targets[:n_train], (train_train_kernel @ c)[:n_train])
+                validation_error_energies = get_mae(validation_targets[:n_validation], (validation_train_kernel @ c)[:n_validation])
+                test_error_energies = get_mae(test_targets[:n_test], (test_train_kernel @ c)[:n_test])
+            else:
+                raise ValueError("The optimization target must be rmse or mae")
+            #print()
+            #print(log_C0, log_C, alpha)
+            #print(train_error_energies, validation_error_energies, test_error_energies, train_error_forces, validation_error_forces, test_error_forces)
+            validation_score = validation_error_energies+validation_error_forces
+            if validation_score < validation_score_best:
+                validation_score_best = validation_score
+                validation_best_forces = validation_error_forces
+                validation_best_energies = validation_error_energies
+                test_best_forces = test_error_forces
+                test_best_energies = test_error_energies
+                log_C0_best = log_C0
+                log_C_best = log_C
+                alpha_best = alpha
 
-        print(f"Test error ({optimization_target}):")
-        print(test_best_energies, test_best_forces)
-        print()
+print(f"Best optimization parameters: log_C0={log_C0_best}, log_C={log_C_best}, alpha={alpha_best}")
+print(f"Best validation error: {validation_best_energies} {validation_best_forces}")
 
-        if validation_score_best < validation_score_best_best:
-            validation_score_best_best = validation_score_best
-            a_best = a
-            b_best = b
-            test_best_best_energies = test_best_energies
-            test_best_best_forces = test_best_forces
-
+print(f"Test error ({optimization_target}):")
+print(test_best_energies, test_best_forces)
 print()
-print()
-print()
-print("--------------------------------------------------------------------------------------")
-print(f"Best parameters: {a_best}, {b_best}")
-print(f"Best energy and force errors: {test_best_best_energies}, {test_best_best_forces}")
 
